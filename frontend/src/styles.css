@@ -1,0 +1,399 @@
+:root {
+  --bg: #f6f7f4;
+  --panel: #ffffff;
+  --ink: #26312b;
+  --line: #d8ded9;
+  --accent: #2f6f4f;
+  --accent-soft: #e3efe8;
+  --danger: #b3453c;
+  --warn: #a4762a;
+  font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* --- toolbar --- */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+.scenario-name {
+  width: 180px;
+}
+
+.notice {
+  color: var(--accent);
+}
+
+/* --- layout --- */
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.left {
+  width: 190px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.center {
+  flex: 1;
+  min-width: 0;
+}
+
+.right {
+  width: 260px;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  overflow-y: auto;
+}
+
+.bottom {
+  height: 260px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs button {
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--bg);
+  padding: 4px 14px;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: var(--panel);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tab-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px;
+}
+
+/* --- panels --- */
+.palette,
+.properties {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+}
+
+.palette h3,
+.properties h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.palette h4,
+.properties h4,
+.sim-settings h4 {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: #5a675f;
+  text-transform: none;
+}
+
+.palette button {
+  text-align: left;
+}
+
+.palette-hint,
+.hint {
+  font-size: 12px;
+  color: #6c7871;
+  line-height: 1.5;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.danger {
+  color: var(--danger);
+}
+
+button.tiny {
+  padding: 1px 6px;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+input,
+select {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font: inherit;
+  background: #fff;
+  max-width: 100%;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #4a554e;
+}
+
+ul {
+  margin: 2px 0;
+  padding-left: 18px;
+}
+
+/* --- canvas nodes --- */
+.device-node {
+  width: 64px;
+  text-align: center;
+  cursor: grab;
+}
+
+.device-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.device-node.selected .device-icon,
+.device-node.selected {
+  outline: none;
+}
+
+.device-node.selected .device-icon {
+  box-shadow: 0 0 0 3px rgba(47, 111, 79, 0.35);
+}
+
+.device-label {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.segment-node {
+  min-width: 70px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 2px dashed #7c8a94;
+  background: #eef2f5;
+  text-align: center;
+  cursor: grab;
+}
+
+.segment-node.selected {
+  box-shadow: 0 0 0 3px rgba(47, 111, 79, 0.35);
+}
+
+.segment-kind {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.segment-label {
+  font-size: 10px;
+  color: #5a675f;
+}
+
+.seg-lrwpan {
+  border-color: #8a6d3b;
+  background: #f4eee2;
+}
+
+.seg-wifiAdhoc,
+.seg-wifiInfra {
+  border-color: #3b6e8a;
+  background: #e2edf4;
+}
+
+.has-error .device-icon,
+.segment-node.has-error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(179, 69, 60, 0.3);
+}
+
+/* --- sim settings --- */
+.sim-settings {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.sim-settings section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.apps-section {
+  flex: 1;
+}
+
+.app-add {
+  display: flex;
+  gap: 6px;
+}
+
+.app-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.app-row label {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-row input[type="number"] {
+  width: 60px;
+}
+
+.app-kind {
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 60px;
+}
+
+/* --- code view --- */
+.code-view,
+.run-view {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+}
+
+.code-toolbar,
+.run-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.code,
+.run-log {
+  flex: 1;
+  margin: 0;
+  padding: 10px;
+  background: #20261f;
+  color: #d7e0d4;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  min-height: 80px;
+  white-space: pre;
+}
+
+.issues {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.issues .error {
+  color: var(--danger);
+}
+
+.issues .warning {
+  color: var(--warn);
+}
+
+.state-chip {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.state-chip.state-failed {
+  background: #f4e2e0;
+  color: var(--danger);
+}
+
+.state-chip.state-running {
+  background: #e2edf4;
+  color: #3b6e8a;
+}
+
+.run-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.artifacts h4 {
+  margin: 4px 0;
+}

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "name": "rpl-line",
+  "simulation": {
+    "duration": 300,
+    "seed": 1,
+    "scale": 1.0,
+    "pcap": false,
+    "logComponents": []
+  },
+  "nodes": [
+    { "id": "n0", "name": "root", "x": 0, "y": 100 },
+    { "id": "n1", "name": "relay", "x": 60, "y": 100 },
+    { "id": "n2", "name": "leaf", "x": 120, "y": 100 }
+  ],
+  "networks": [
+    {
+      "id": "net-pan",
+      "type": "lrwpan",
+      "members": ["n0", "n1", "n2"],
+      "x": 60,
+      "y": 30,
+      "lrwpan": { "panId": 1, "lossModel": "logDistance" }
+    }
+  ],
+  "stack": {
+    "ip": "ipv6",
+    "routing": "rpl",
+    "rpl": { "root": "n0", "ocp": "mrhof", "enableLql": true }
+  },
+  "apps": [
+    {
+      "type": "ping",
+      "id": "app-ping",
+      "from": "n2",
+      "to": "n0",
+      "start": 150,
+      "count": 5,
+      "interval": 2.0
+    }
+  ]
+}

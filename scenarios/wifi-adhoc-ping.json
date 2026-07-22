@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "name": "wifi-adhoc-ping",
+  "simulation": {
+    "duration": 30,
+    "seed": 1,
+    "scale": 1.0,
+    "pcap": false,
+    "logComponents": []
+  },
+  "nodes": [
+    { "id": "n0", "name": "alice", "x": 100, "y": 200 },
+    { "id": "n1", "name": "bob", "x": 140, "y": 200 }
+  ],
+  "networks": [
+    {
+      "id": "net-wifi",
+      "type": "wifiAdhoc",
+      "members": ["n0", "n1"],
+      "x": 130,
+      "y": 120,
+      "wifi": { "standard": "80211g", "ssid": "adhoc-demo" }
+    }
+  ],
+  "stack": { "ip": "ipv4", "routing": "global" },
+  "apps": [
+    {
+      "type": "ping",
+      "id": "app-ping",
+      "from": "n1",
+      "to": "n0",
+      "start": 2,
+      "count": 5,
+      "interval": 1.0
+    }
+  ]
+}

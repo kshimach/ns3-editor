@@ -74,8 +74,20 @@ Ns3EditGlobalAddressOf(Ptr<Node> node)
 static void
 {{ app.cvar }}Start(NodeContainer nodes)
 {
+    // Wait for the DODAG to actually converge before pinging, retrying rather
+    // than failing on an early start time: the target must have SLAACed its
+    // global address (so it can be named), and the root must hold a DAO from
+    // every other node (so a route to the target exists). The root's own
+    // address settles well before the rest of the DODAG does, so checking the
+    // address alone would fire the ping too early and lose every packet.
+    Ptr<rpl::RplRoutingProtocol> rootRpl =
+        nodes.Get({{ rpl.root_index }})->GetObject<rpl::RplRoutingProtocol>();
     Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
-    NS_ABORT_MSG_IF(target.IsAny(), "ping target has not settled its SLAAC address yet");
+    if (target.IsAny() || rootRpl->GetTopologySize() + 1 < nodes.GetN())
+    {
+        Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
+        return;
+    }
 
     PingHelper {{ app.cvar }}(target);
     {{ app.cvar }}.SetAttribute("Count", UintegerValue({{ app.count }}));

@@ -48,6 +48,45 @@ PrintDodag(NodeContainer nodes)
     }
 }
 
+{% if has_ping %}
+// With RPL every node forms its global address through SLAAC at run time, so a
+// ping target has no address to name at configuration time; resolve it once
+// the DODAG has settled instead.
+static Ipv6Address
+Ns3EditGlobalAddressOf(Ptr<Node> node)
+{
+    Ptr<Ipv6> ipv6 = node->GetObject<Ipv6>();
+    for (uint32_t i = 0; ipv6 && i < ipv6->GetNInterfaces(); i++)
+    {
+        for (uint32_t j = 0; j < ipv6->GetNAddresses(i); j++)
+        {
+            Ipv6Address addr = ipv6->GetAddress(i, j).GetAddress();
+            if (!addr.IsLinkLocal() && !addr.IsLocalhost() && addr != Ipv6Address::GetAny())
+            {
+                return addr;
+            }
+        }
+    }
+    return Ipv6Address::GetAny();
+}
+
+{% for app in apps if app.kind == 'ping' %}
+static void
+{{ app.cvar }}Start(NodeContainer nodes)
+{
+    Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
+    NS_ABORT_MSG_IF(target.IsAny(), "ping target has not settled its SLAAC address yet");
+
+    PingHelper {{ app.cvar }}(target);
+    {{ app.cvar }}.SetAttribute("Count", UintegerValue({{ app.count }}));
+    {{ app.cvar }}.SetAttribute("Interval", TimeValue(Seconds({{ app.interval }})));
+    ApplicationContainer {{ app.cvar }}Apps = {{ app.cvar }}.Install(nodes.Get({{ app.from_index }}));
+    {{ app.cvar }}Apps.Start(Seconds(0));
+    {{ app.cvar }}Apps.Stop(Seconds({{ app.stop }} - {{ app.start }}));
+}
+
+{% endfor %}
+{% endif %}
 {% endif %}
 int
 main(int argc, char** argv)
@@ -153,6 +192,21 @@ main(int argc, char** argv)
 {% endfor %}
 
 {% if ipv6 %}
+{% if rpl %}
+    // No address is assigned here: the root SLAACs its own from RootPrefix and
+    // disseminates it over the DODAG (RFC 6550 section 6.7.10's Prefix
+    // Information option), and every other node SLAACs its own address on it in
+    // turn.
+    Ipv6AddressHelper ipv6Helper;
+{% for net in networks %}
+    Ipv6InterfaceContainer {{ net.cvar }}Ifaces =
+        ipv6Helper.AssignWithoutAddress({{ net.cvar }}{{ 'SlpDevices' if net.type == 'lrwpan' else 'Devices' }});
+    for (uint32_t i = 0; i < {{ net.cvar }}Ifaces.GetN(); i++)
+    {
+        {{ net.cvar }}Ifaces.SetForwarding(i, true);
+    }
+{% endfor %}
+{% else %}
     // Not 2001:db8::/32: Ipv6L3Protocol::IpForward() drops the documentation
     // prefix, so multi-hop routes would never work with it.
     Ipv6AddressHelper ipv6Helper;
@@ -165,6 +219,7 @@ main(int argc, char** argv)
         {{ net.cvar }}Ifaces.SetForwarding(i, true);
     }
 {% endfor %}
+{% endif %}
 {% else %}
     Ipv4AddressHelper ipv4Helper;
 {% for net in networks %}
@@ -174,9 +229,9 @@ main(int argc, char** argv)
 {% endif %}
 {% if rpl %}
 
-    // The DODAGID is the root's first global address, so this comes after
-    // address assignment.
-    rplHelper.SetRoot(nodes.Get({{ rpl.root_index }}));
+    // The DODAGID is the root's first global address: the root SLAACs it from
+    // this prefix and disseminates it over the DODAG.
+    rplHelper.SetRoot(nodes.Get({{ rpl.root_index }}), Ipv6Address("{{ rpl.root_prefix }}"), 64);
 {% endif %}
 {% if global_routing %}
 
@@ -185,6 +240,11 @@ main(int argc, char** argv)
 
 {% for app in apps %}
 {% if app.kind == 'ping' %}
+{% if rpl %}
+    // App "{{ app.id }}" (ping): scheduled rather than installed up front, since
+    // the target's SLAAC address only exists once the DODAG has settled.
+    Simulator::Schedule(Seconds({{ app.start }}), &{{ app.cvar }}Start, nodes);
+{% else %}
     // App "{{ app.id }}" (ping)
     PingHelper {{ app.cvar }}({{ app.target }});
     {{ app.cvar }}.SetAttribute("Count", UintegerValue({{ app.count }}));
@@ -192,6 +252,7 @@ main(int argc, char** argv)
     ApplicationContainer {{ app.cvar }}Apps = {{ app.cvar }}.Install(nodes.Get({{ app.from_index }}));
     {{ app.cvar }}Apps.Start(Seconds({{ app.start }}));
     {{ app.cvar }}Apps.Stop(Seconds({{ app.stop }}));
+{% endif %}
 {% elif app.kind == 'udpEcho' %}
     // App "{{ app.id }}" (UDP echo)
     UdpEchoServerHelper {{ app.cvar }}Server({{ app.port }});

@@ -84,6 +84,19 @@ def _target_address_expr(scenario: Scenario, node_id: str, ipv6: bool) -> str:
     )
 
 
+def _rpl_root_prefix(scenario: Scenario) -> str:
+    """The /64 prefix the RPL root SLAACs its DODAGID from.
+
+    Reuses the IPv6 base of the network the root sits on, so it matches the
+    prefix the rest of that network would otherwise have been numbered from.
+    """
+    root = scenario.stack.rpl.root
+    for i, net in enumerate(scenario.networks):
+        if root in net.members:
+            return f"2001:{i + 1}::"
+    return "2001:1::"
+
+
 def _network_ctx(scenario: Scenario, i: int, net: Network, rpl_mrhof: bool) -> dict[str, Any]:
     ctx: dict[str, Any] = {
         "cvar": f"net{i}",
@@ -131,6 +144,7 @@ def _app_ctx(scenario: Scenario, i: int, app, ipv6: bool) -> dict[str, Any]:
     if isinstance(app, PingApp):
         common.update(
             from_index=scenario.node_index(app.fromNode),
+            to_index=scenario.node_index(app.to),
             target=_target_address_expr(scenario, app.to, ipv6),
             count=app.count,
             interval=app.interval,
@@ -189,6 +203,7 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
         "rpl": (
             {
                 "root_index": scenario.node_index(scenario.stack.rpl.root),
+                "root_prefix": _rpl_root_prefix(scenario),
                 "mrhof": rpl_mrhof,
                 "enable_lql": scenario.stack.rpl.enableLql,
             }

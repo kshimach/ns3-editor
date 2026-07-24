@@ -47,15 +47,22 @@ def test_rpl_line_structure():
     assert '#include "ns3/sixlowpan-module.h"' in code
     # stack order: rpl routing helper installed before sixlowpan + addresses
     assert code.index("SetRoutingHelper(rplHelper)") < code.index("Sixlowpan.Install")
-    assert code.index("Sixlowpan.Install") < code.index("ipv6Helper.SetBase")
-    # root marked only after addresses exist (DODAGID = first global address)
-    assert code.index("ipv6Helper.SetBase") < code.index("rplHelper.SetRoot(nodes.Get(0))")
+    # RPL nodes SLAAC their own addresses, so none is assigned up front
+    assert "ipv6Helper.SetBase" not in code
+    assert "AssignWithoutAddress" in code
+    assert code.index("Sixlowpan.Install") < code.index("AssignWithoutAddress")
+    # root marked with its own prefix, only after AssignWithoutAddress
+    assert 'rplHelper.SetRoot(nodes.Get(0), Ipv6Address("2001:1::"), 64);' in code
+    assert code.index("AssignWithoutAddress") < code.index("rplHelper.SetRoot")
     assert 'rplHelper.Set("Ocp", UintegerValue(rpl::RPL_OCP_MRHOF));' in code
     assert 'rplHelper.Set("EnableLql", BooleanValue(true));' in code
     # MRHOF turns the error model on by default
     assert "LrWpanErrorModel" in code
-    # v6 target address: global address is at position 1
-    assert "PingHelper app0(net0Ifaces.GetAddress(0, 1));" in code
+    # the ping target only exists after SLAAC, so it is resolved at run time and
+    # the ping is scheduled rather than installed up front
+    assert "Ns3EditGlobalAddressOf" in code
+    assert "&app0Start, nodes);" in code
+    assert "PingHelper app0(net0Ifaces.GetAddress" not in code
     assert "PrintDodag" in code
 
 

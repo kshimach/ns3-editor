@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "name": "rpl-mesh",
+  "simulation": {
+    "duration": 200,
+    "seed": 1,
+    "scale": 1.0,
+    "pcap": true,
+    "logComponents": []
+  },
+  "nodes": [
+    { "id": "n0", "name": "root", "x": 0, "y": 0 },
+    { "id": "n1", "name": "a", "x": 50, "y": 0 },
+    { "id": "n2", "name": "b", "x": 100, "y": 0 },
+    { "id": "n3", "name": "c", "x": 50, "y": 50 },
+    { "id": "n4", "name": "leaf", "x": 100, "y": 50 }
+  ],
+  "networks": [
+    {
+      "id": "net-pan",
+      "type": "lrwpan",
+      "members": ["n0", "n1", "n2", "n3", "n4"],
+      "x": 50,
+      "y": 25,
+      "lrwpan": { "panId": 1, "lossModel": "logDistance" }
+    }
+  ],
+  "stack": {
+    "ip": "ipv6",
+    "routing": "rpl",
+    "rpl": { "root": "n0", "ocp": "mrhof", "enableLql": true }
+  },
+  "apps": [
+    {
+      "type": "ping",
+      "id": "app-ping",
+      "from": "n4",
+      "to": "n0",
+      "start": 10,
+      "count": 10,
+      "interval": 2.0
+    }
+  ]
+}

@@ -41,6 +41,10 @@ export function Canvas() {
       data: { label: n.name || n.id },
       selected: selection?.kind === "node" && selection.id === n.id,
       className: errorIds.has(n.id) ? "has-error" : undefined,
+      // Explicit size so the node also shows up in the MiniMap (which does not
+      // fall back to the measured DOM size for custom nodes).
+      width: 64,
+      height: 64,
     }));
     const segments: RFNode[] = scenario.networks
       .filter((n) => n.type !== "p2p")
@@ -51,6 +55,8 @@ export function Canvas() {
         data: { label: n.id, segType: n.type },
         selected: selection?.kind === "network" && selection.id === n.id,
         className: errorIds.has(n.id) ? "has-error" : undefined,
+        width: 70,
+        height: 50,
       }));
     return [...devices, ...segments];
   }, [scenario, selection, errorIds]);
@@ -167,7 +173,13 @@ export function Canvas() {
       proOptions={{ hideAttribution: true }}
     >
       <Background gap={20} />
-      <MiniMap pannable zoomable />
+      <MiniMap
+        pannable
+        zoomable
+        nodeColor={(n) => (n.type === "segment" ? "#d8c9a3" : "#4f9d69")}
+        nodeStrokeColor={(n) => (n.type === "segment" ? "#b0a074" : "#2e7d32")}
+        nodeStrokeWidth={3}
+      />
       <Controls />
     </ReactFlow>
   );

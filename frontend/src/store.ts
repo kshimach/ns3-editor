@@ -32,6 +32,7 @@ interface EditorState {
   addSegment: (type: Exclude<NetworkType, "p2p">, x: number, y: number) => void;
   addP2p: (a: string, b: string) => void;
   addMember: (networkId: string, nodeId: string) => void;
+  removeMember: (networkId: string, nodeId: string) => void;
   moveElement: (id: string, x: number, y: number) => void;
   removeElement: (id: string) => void;
   updateNode: (id: string, patch: Partial<ScenarioNode>) => void;
@@ -42,6 +43,9 @@ interface EditorState {
 }
 
 let nextId = 0;
+
+/** Shared segments (everything but p2p) are the ones a node "joins". */
+const sharedSegments = (scenario: Scenario) => scenario.networks.filter((n) => n.type !== "p2p");
 
 export const useEditor = create<EditorState>((set, get) => ({
   scenario: defaultScenario(),
@@ -65,10 +69,20 @@ export const useEditor = create<EditorState>((set, get) => ({
   addNode: (x, y) => {
     const id = `n${nextId++}`;
     const { scenario } = get();
+    // With exactly one shared segment there is no ambiguity about where a new
+    // node belongs, so join it instead of leaving an orphan that the user has
+    // to wire up by hand (and that fails validation until they do).
+    const shared = sharedSegments(scenario);
+    const joinId = shared.length === 1 ? shared[0].id : null;
     set({
       scenario: {
         ...scenario,
         nodes: [...scenario.nodes, { id, name: id, x, y }],
+        networks: joinId
+          ? scenario.networks.map((n) =>
+              n.id === joinId ? { ...n, members: [...n.members, id] } : n,
+            )
+          : scenario.networks,
       },
       selection: { kind: "node", id },
     });
@@ -77,8 +91,31 @@ export const useEditor = create<EditorState>((set, get) => ({
   addSegment: (type, x, y) => {
     const id = `net${nextId++}`;
     const { scenario } = get();
+    const net = defaultNetwork(id, type, x, y);
+    // Absorb every node that is not already on a shared segment: putting all
+    // the nodes on one PAN is the common case and should need no dragging.
+    // Nodes already on another segment keep that membership, so a second PAN
+    // starts empty and is filled from the node context menu.
+    const attached = new Set(sharedSegments(scenario).flatMap((n) => n.members));
+    net.members = scenario.nodes.filter((n) => !attached.has(n.id)).map((n) => n.id);
+    // 6LoWPAN only runs over IPv6, so adopt it instead of leaving a scenario
+    // that cannot generate. Global routing is IPv4-only and would just trade
+    // one error for another; static is the neutral landing spot, which leaves
+    // RPL an explicit choice rather than something picked behind the user's
+    // back (it would also need a DODAG root).
+    const stack =
+      type === "lrwpan"
+        ? {
+            ...scenario.stack,
+            ip: "ipv6" as const,
+            routing:
+              scenario.stack.routing === "global"
+                ? ("static" as const)
+                : scenario.stack.routing,
+          }
+        : scenario.stack;
     set({
-      scenario: { ...scenario, networks: [...scenario.networks, defaultNetwork(id, type, x, y)] },
+      scenario: { ...scenario, networks: [...scenario.networks, net], stack },
       selection: { kind: "network", id },
     });
   },
@@ -107,6 +144,25 @@ export const useEditor = create<EditorState>((set, get) => ({
         networks: scenario.networks.map((n) =>
           n.id === networkId && !n.members.includes(nodeId)
             ? { ...n, members: [...n.members, nodeId] }
+            : n,
+        ),
+      },
+    });
+  },
+
+  removeMember: (networkId, nodeId) => {
+    const { scenario } = get();
+    set({
+      scenario: {
+        ...scenario,
+        networks: scenario.networks.map((n) =>
+          n.id === networkId
+            ? {
+                ...n,
+                members: n.members.filter((m) => m !== nodeId),
+                // A node that just left cannot go on being this network's AP.
+                wifi: n.wifi.apNode === nodeId ? { ...n.wifi, apNode: null } : n.wifi,
+              }
             : n,
         ),
       },

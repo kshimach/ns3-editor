@@ -9,9 +9,10 @@ import {
   ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useMemo } from "react";
+import { MouseEvent as ReactMouseEvent, useCallback, useMemo, useState } from "react";
 
 import { useEditor } from "../store";
+import { ContextMenu, MenuTarget } from "./ContextMenu";
 import { DeviceNode } from "./DeviceNode";
 import { SegmentNode } from "./SegmentNode";
 
@@ -26,7 +27,8 @@ export function Canvas() {
   const removeElement = useEditor((s) => s.removeElement);
   const addP2p = useEditor((s) => s.addP2p);
   const addMember = useEditor((s) => s.addMember);
-  const updateNetwork = useEditor((s) => s.updateNetwork);
+
+  const [menu, setMenu] = useState<MenuTarget | null>(null);
 
   const errorIds = useMemo(
     () => new Set(issues.filter((i) => i.level === "error").map((i) => i.elementId)),
@@ -38,7 +40,13 @@ export function Canvas() {
       id: n.id,
       type: "device",
       position: { x: n.x, y: n.y },
-      data: { label: n.name || n.id },
+      data: {
+        label: n.name || n.id,
+        // Shown on the node in place of a spoke drawn to the segment hub.
+        badges: scenario.networks
+          .filter((net) => net.type !== "p2p" && net.members.includes(n.id))
+          .map((net) => ({ id: net.id, type: net.type })),
+      },
       selected: selection?.kind === "node" && selection.id === n.id,
       className: errorIds.has(n.id) ? "has-error" : undefined,
       // Explicit size so the node also shows up in the MiniMap (which does not
@@ -62,41 +70,23 @@ export function Canvas() {
   }, [scenario, selection, errorIds]);
 
   const rfEdges: Edge[] = useMemo(() => {
-    const scale = scenario.simulation.scale;
-    const byId = new Map(scenario.nodes.map((n) => [n.id, n]));
     const edges: Edge[] = [];
+    // Only p2p links are drawn as edges. Membership in a shared segment is a
+    // badge on the node instead: one spoke per member buries the canvas in
+    // lines as soon as a PAN holds more than a handful of nodes, and every one
+    // of them had to be dragged by hand.
     for (const net of scenario.networks) {
-      if (net.type === "p2p") {
-        const [a, b] = net.members;
-        if (!a || !b) continue;
-        edges.push({
-          id: net.id,
-          source: a,
-          target: b,
-          label: net.p2p.dataRate,
-          selected: selection?.kind === "network" && selection.id === net.id,
-          className: `p2p-edge${errorIds.has(net.id) ? " has-error" : ""}`,
-        });
-      } else {
-        const wireless = net.type === "wifiAdhoc" || net.type === "wifiInfra" || net.type === "lrwpan";
-        for (const m of net.members) {
-          const dev = byId.get(m);
-          // Wireless: what matters physically is the inter-node distance, but
-          // labelling each spoke with hub distance is misleading, so show the
-          // distance on the spoke only as a rough placement aid.
-          const dist =
-            wireless && dev
-              ? Math.round(Math.hypot((dev.x - net.x) * scale, (dev.y - net.y) * scale))
-              : null;
-          edges.push({
-            id: `m:${net.id}:${m}`,
-            source: m,
-            target: net.id,
-            label: dist !== null ? `${dist}m` : undefined,
-            className: "member-edge",
-          });
-        }
-      }
+      if (net.type !== "p2p") continue;
+      const [a, b] = net.members;
+      if (!a || !b) continue;
+      edges.push({
+        id: net.id,
+        source: a,
+        target: b,
+        label: net.p2p.dataRate,
+        selected: selection?.kind === "network" && selection.id === net.id,
+        className: `p2p-edge${errorIds.has(net.id) ? " has-error" : ""}`,
+      });
     }
     return edges;
   }, [scenario, selection, errorIds]);
@@ -132,55 +122,60 @@ export function Canvas() {
       for (const n of nodes) {
         removeElement(n.id);
       }
+      // Only p2p links are edges now, and a p2p edge's id is its network id.
       for (const e of edges) {
-        if (e.id.startsWith("m:")) {
-          const [, netId, nodeId] = e.id.split(":");
-          const net = scenario.networks.find((n) => n.id === netId);
-          if (net) {
-            updateNetwork(netId, { members: net.members.filter((m) => m !== nodeId) });
-          }
-        } else {
-          removeElement(e.id); // p2p edge id == network id
-        }
+        removeElement(e.id);
       }
     },
-    [scenario, removeElement, updateNetwork],
+    [removeElement],
   );
 
+  const onContextMenu = useCallback((e: ReactMouseEvent, n: RFNode) => {
+    e.preventDefault();
+    setMenu({ id: n.id, x: e.clientX, y: e.clientY });
+  }, []);
+
   return (
-    <ReactFlow
-      nodes={rfNodes}
-      edges={rfEdges}
-      nodeTypes={nodeTypes}
-      onNodesChange={onNodesChange}
-      onConnect={onConnect}
-      onDelete={onDelete}
-      onNodeClick={(_, n) =>
-        select(
-          scenario.networks.some((net) => net.id === n.id)
-            ? { kind: "network", id: n.id }
-            : { kind: "node", id: n.id },
-        )
-      }
-      onEdgeClick={(_, e) => {
-        if (!e.id.startsWith("m:")) {
-          select({ kind: "network", id: e.id });
+    <>
+      <ReactFlow
+        nodes={rfNodes}
+        edges={rfEdges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onConnect={onConnect}
+        onDelete={onDelete}
+        onNodeClick={(_, n) =>
+          select(
+            scenario.networks.some((net) => net.id === n.id)
+              ? { kind: "network", id: n.id }
+              : { kind: "node", id: n.id },
+          )
         }
-      }}
-      onPaneClick={() => select(null)}
-      fitView
-      deleteKeyCode={["Backspace", "Delete"]}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background gap={20} />
-      <MiniMap
-        pannable
-        zoomable
-        nodeColor={(n) => (n.type === "segment" ? "#d8c9a3" : "#4f9d69")}
-        nodeStrokeColor={(n) => (n.type === "segment" ? "#b0a074" : "#2e7d32")}
-        nodeStrokeWidth={3}
-      />
-      <Controls />
-    </ReactFlow>
+        onNodeContextMenu={onContextMenu}
+        onEdgeClick={(_, e) => select({ kind: "network", id: e.id })}
+        onPaneClick={() => {
+          select(null);
+          setMenu(null);
+        }}
+        onPaneContextMenu={(e) => {
+          e.preventDefault();
+          setMenu(null);
+        }}
+        fitView
+        deleteKeyCode={["Backspace", "Delete"]}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background gap={20} />
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor={(n) => (n.type === "segment" ? "#d8c9a3" : "#4f9d69")}
+          nodeStrokeColor={(n) => (n.type === "segment" ? "#b0a074" : "#2e7d32")}
+          nodeStrokeWidth={3}
+        />
+        <Controls />
+      </ReactFlow>
+      {menu && <ContextMenu target={menu} onClose={() => setMenu(null)} />}
+    </>
   );
 }

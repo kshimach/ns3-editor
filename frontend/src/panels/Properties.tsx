@@ -62,6 +62,7 @@ function NodeProps({ id }: { id: string }) {
 function NetworkProps({ net }: { net: Network }) {
   const scenario = useEditor((s) => s.scenario);
   const updateNetwork = useEditor((s) => s.updateNetwork);
+  const removeMember = useEditor((s) => s.removeMember);
   const removeElement = useEditor((s) => s.removeElement);
   const nodeName = (id: string) => scenario.nodes.find((n) => n.id === id)?.name || id;
 
@@ -210,12 +211,7 @@ function NetworkProps({ net }: { net: Network }) {
         {net.members.map((m) => (
           <li key={m}>
             {nodeName(m)}
-            <button
-              className="tiny"
-              onClick={() =>
-                updateNetwork(net.id, { members: net.members.filter((x) => x !== m) })
-              }
-            >
+            <button className="tiny" onClick={() => removeMember(net.id, m)}>
               外す
             </button>
           </li>

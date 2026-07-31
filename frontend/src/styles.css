@@ -269,6 +269,84 @@ ul {
   background: #e2edf4;
 }
 
+/* Segment membership, shown on the node instead of a spoke to the hub. */
+.device-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.badge {
+  font-size: 9px;
+  line-height: 1.5;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid #7c8a94;
+  background: #eef2f5;
+  color: #38434c;
+  white-space: nowrap;
+}
+
+/* --- canvas context menu --- */
+.context-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu button {
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.context-menu button:hover {
+  background: var(--accent-soft);
+}
+
+.context-menu button.danger {
+  color: var(--danger);
+}
+
+.context-menu hr {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
+}
+
+.context-title {
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.context-section {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: #8a949c;
+  padding: 6px 8px 2px;
+}
+
+.context-empty {
+  font-size: 11px;
+  color: #8a949c;
+  padding: 4px 8px;
+}
+
 .has-error .device-icon,
 .segment-node.has-error {
   border-color: var(--danger) !important;

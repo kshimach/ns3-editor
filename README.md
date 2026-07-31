@@ -48,18 +48,20 @@ cd ../backend && .venv/bin/uvicorn app.main:app --port 8000
 
 ## 使い方
 
-1. 左パレットからノード・セグメントを追加
-2. ノード下ハンドルから別ノードへドラッグ = P2P リンク、セグメントへドラッグ = 参加
+詳しい操作方法は [docs/MANUAL.md](docs/MANUAL.md) を参照。要点:
+
+1. 左パレットからノード・セグメントを追加 (未所属ノードは自動でセグメントに参加する)
+2. 参加先の変更・PHY/MAC 設定はノードやセグメントの右クリックメニューから
 3. 下部「シナリオ設定」でスタック・アプリ・シミュレーション時間を設定
 4. 「生成コード」タブで検証+C++ プレビュー、「実行」タブで実行・ログ確認
 5. ツールバーで保存/読込 (`scenarios/*.json`)
 
-サンプル: `wifi-adhoc-ping` (IPv4 WiFi アドホック 2 ノード)、`rpl-line` (LR-WPAN 3 ノード直列、RPL MRHOF+LQL)。
+サンプル: `wifi-adhoc-ping` (IPv4 WiFi アドホック 2 ノード)、`rpl-line` (LR-WPAN 3 ノード直列、RPL MRHOF+LQL)、`rpl-mesh` (LR-WPAN 5 ノードのメッシュ、RPL MRHOF+LQL)。
 
 ## 注意
 
 - デフォルト設定の WiFi は約 50m を超えると受信不可 (preamble 検出閾値 -82dBm)。ノード間隔に注意
-- 6LoWPAN (lr-wpan) は IPv6 必須。IPv6 のアドレスは `2001:<n>::/64` を自動割当 (`2001:db8::` は ns-3 が forward しないため不使用)
+- 6LoWPAN (lr-wpan) は IPv6 必須。セグメント追加時にスタックが自動で IPv6 に切り替わる。IPv6 のアドレスは `2001:<n>::/64` を自動割当 (`2001:db8::` は ns-3 が forward しないため不使用)
 - 実行は同時 1 本 (ns-3 ビルドロック衝突回避)。成果物 (pcap 等) は `runs/<timestamp>/` に隔離
 
 ## テスト

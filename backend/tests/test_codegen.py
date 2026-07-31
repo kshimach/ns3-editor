@@ -64,6 +64,11 @@ def test_rpl_line_structure():
     assert "&app0Start, nodes);" in code
     assert "PingHelper app0(net0Ifaces.GetAddress" not in code
     assert "PrintDodag" in code
+    # Regression: the sender's own SLAAC address was never checked, only the
+    # target's -- Ipv6L3Protocol::SourceAddressSelection() asserts if a node
+    # tries to send before it has one, which a slow-to-converge DODAG can
+    # still trigger well after the topology-size check passes.
+    assert "senderReady" in code
 
 
 def test_rpl_udp_echo_and_onoff_resolve_target_at_runtime():
@@ -94,6 +99,15 @@ def test_rpl_udp_echo_and_onoff_resolve_target_at_runtime():
     assert "app2Start(NodeContainer nodes)" in code
     assert 'OnOffHelper app2("ns3::UdpSocketFactory", Inet6SocketAddress(target, 9001));' in code
     assert "&app2Start, nodes);" in code
+
+    # Regression: crashed on Ipv6L3Protocol::SourceAddressSelection() when the
+    # sender itself had not SLAACed yet -- only the target's address was
+    # checked. Each Start() must also confirm its own sender is ready before
+    # installing the client/sender application.
+    assert "Ns3EditGlobalAddressOf(nodes.Get(2))" in code  # echo client is n2
+    assert "Ns3EditGlobalAddressOf(nodes.Get(1))" in code  # onoff sender is n1
+    # declared once and checked once per app's Start(): ping, udpEcho, onoff
+    assert code.count("senderReady") == 6
 
     # The server/sink side needs no address and stays installed up front.
     assert "UdpEchoServerHelper app1Server(9);" in code

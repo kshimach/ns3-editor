@@ -76,14 +76,17 @@ static void
 {
     // Wait for the DODAG to actually converge before pinging, retrying rather
     // than failing on an early start time: the target must have SLAACed its
-    // global address (so it can be named), and the root must hold a DAO from
-    // every other node (so a route to the target exists). The root's own
-    // address settles well before the rest of the DODAG does, so checking the
-    // address alone would fire the ping too early and lose every packet.
+    // global address (so it can be named), the sender must have SLAACed one
+    // too (Ipv6L3Protocol::SourceAddressSelection() asserts if it has not),
+    // and the root must hold a DAO from every other node (so a route to the
+    // target exists). The root's own address settles well before the rest of
+    // the DODAG does, so checking the address alone would fire the ping too
+    // early and lose every packet.
     Ptr<rpl::RplRoutingProtocol> rootRpl =
         nodes.Get({{ rpl.root_index }})->GetObject<rpl::RplRoutingProtocol>();
     Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
-    if (target.IsAny() || rootRpl->GetTopologySize() + 1 < nodes.GetN())
+    bool senderReady = !Ns3EditGlobalAddressOf(nodes.Get({{ app.from_index }})).IsAny();
+    if (target.IsAny() || !senderReady || rootRpl->GetTopologySize() + 1 < nodes.GetN())
     {
         Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
         return;
@@ -103,11 +106,14 @@ static void
 {{ app.cvar }}Start(NodeContainer nodes)
 {
     // Same convergence wait as the ping helper above: the server's address
-    // must exist, and the root must have heard from every node.
+    // must exist, the client itself must have SLAACed one too
+    // (Ipv6L3Protocol::SourceAddressSelection() asserts if it has not), and
+    // the root must have heard from every node.
     Ptr<rpl::RplRoutingProtocol> rootRpl =
         nodes.Get({{ rpl.root_index }})->GetObject<rpl::RplRoutingProtocol>();
     Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.server_index }}));
-    if (target.IsAny() || rootRpl->GetTopologySize() + 1 < nodes.GetN())
+    bool senderReady = !Ns3EditGlobalAddressOf(nodes.Get({{ app.client_index }})).IsAny();
+    if (target.IsAny() || !senderReady || rootRpl->GetTopologySize() + 1 < nodes.GetN())
     {
         Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
         return;
@@ -129,11 +135,14 @@ static void
 {{ app.cvar }}Start(NodeContainer nodes)
 {
     // Same convergence wait as the ping helper above: the sink's address must
-    // exist, and the root must have heard from every node.
+    // exist, the sender itself must have SLAACed one too
+    // (Ipv6L3Protocol::SourceAddressSelection() asserts if it has not), and
+    // the root must have heard from every node.
     Ptr<rpl::RplRoutingProtocol> rootRpl =
         nodes.Get({{ rpl.root_index }})->GetObject<rpl::RplRoutingProtocol>();
     Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
-    if (target.IsAny() || rootRpl->GetTopologySize() + 1 < nodes.GetN())
+    bool senderReady = !Ns3EditGlobalAddressOf(nodes.Get({{ app.from_index }})).IsAny();
+    if (target.IsAny() || !senderReady || rootRpl->GetTopologySize() + 1 < nodes.GetN())
     {
         Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
         return;

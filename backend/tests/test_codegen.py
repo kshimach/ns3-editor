@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from app.codegen import CodegenError, generate
-from app.models import Scenario
+from app.models import OnOffApp, Scenario, UdpEchoApp
 from app.validate import has_errors, validate_scenario
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
@@ -64,6 +64,40 @@ def test_rpl_line_structure():
     assert "&app0Start, nodes);" in code
     assert "PingHelper app0(net0Ifaces.GetAddress" not in code
     assert "PrintDodag" in code
+
+
+def test_rpl_udp_echo_and_onoff_resolve_target_at_runtime():
+    # Regression: UdpEcho/OnOff named the target's address at configuration
+    # time (net0Ifaces.GetAddress(idx, 1)), same as ping did before it was
+    # fixed. Under RPL an interface has only its link-local address (index 0)
+    # until SLAAC runs, so building that expression crashed
+    # Ipv6Interface::GetAddress() with "index 1 out of bounds" the moment a
+    # UdpEcho/OnOff app was added to an RPL scenario.
+    scenario = _load("rpl-line")
+    scenario.apps.append(
+        UdpEchoApp(id="app-echo", server="n0", client="n2", port=9, maxPackets=5, interval=2.0)
+    )
+    scenario.apps.append(OnOffApp(id="app-onoff", **{"from": "n1"}, to="n0", port=9001))
+    code = generate(scenario)
+
+    # No configuration-time GetAddress(idx, 1) target for either app.
+    assert "net0Ifaces.GetAddress" not in code
+    assert "Ns3EditGlobalAddressOf" in code
+
+    # Each gets its own convergence-waiting Start(), scheduled rather than
+    # installed up front, mirroring the ping app's app0Start.
+    assert "app1Start(NodeContainer nodes)" in code
+    assert "Ns3EditGlobalAddressOf(nodes.Get(0))" in code  # echo server is n0
+    assert "UdpEchoClientHelper app1Client(target, 9);" in code
+    assert "&app1Start, nodes);" in code
+
+    assert "app2Start(NodeContainer nodes)" in code
+    assert 'OnOffHelper app2("ns3::UdpSocketFactory", Inet6SocketAddress(target, 9001));' in code
+    assert "&app2Start, nodes);" in code
+
+    # The server/sink side needs no address and stays installed up front.
+    assert "UdpEchoServerHelper app1Server(9);" in code
+    assert "PacketSinkHelper app2Sink" in code
 
 
 def test_rpl_error_model_override_off():

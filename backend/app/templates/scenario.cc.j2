@@ -48,10 +48,10 @@ PrintDodag(NodeContainer nodes)
     }
 }
 
-{% if has_ping %}
-// With RPL every node forms its global address through SLAAC at run time, so a
-// ping target has no address to name at configuration time; resolve it once
-// the DODAG has settled instead.
+{% if has_ping or has_udp_echo or has_onoff %}
+// With RPL every node forms its global address through SLAAC at run time, so
+// a ping/echo/onoff target has no address to name at configuration time;
+// resolve it once the DODAG has settled instead.
 static Ipv6Address
 Ns3EditGlobalAddressOf(Ptr<Node> node)
 {
@@ -92,6 +92,55 @@ static void
     PingHelper {{ app.cvar }}(target);
     {{ app.cvar }}.SetAttribute("Count", UintegerValue({{ app.count }}));
     {{ app.cvar }}.SetAttribute("Interval", TimeValue(Seconds({{ app.interval }})));
+    ApplicationContainer {{ app.cvar }}Apps = {{ app.cvar }}.Install(nodes.Get({{ app.from_index }}));
+    {{ app.cvar }}Apps.Start(Seconds(0));
+    {{ app.cvar }}Apps.Stop(Seconds({{ app.stop }} - {{ app.start }}));
+}
+
+{% endfor %}
+{% for app in apps if app.kind == 'udpEcho' %}
+static void
+{{ app.cvar }}Start(NodeContainer nodes)
+{
+    // Same convergence wait as the ping helper above: the server's address
+    // must exist, and the root must have heard from every node.
+    Ptr<rpl::RplRoutingProtocol> rootRpl =
+        nodes.Get({{ rpl.root_index }})->GetObject<rpl::RplRoutingProtocol>();
+    Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.server_index }}));
+    if (target.IsAny() || rootRpl->GetTopologySize() + 1 < nodes.GetN())
+    {
+        Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
+        return;
+    }
+
+    UdpEchoClientHelper {{ app.cvar }}Client(target, {{ app.port }});
+    {{ app.cvar }}Client.SetAttribute("MaxPackets", UintegerValue({{ app.max_packets }}));
+    {{ app.cvar }}Client.SetAttribute("Interval", TimeValue(Seconds({{ app.interval }})));
+    {{ app.cvar }}Client.SetAttribute("PacketSize", UintegerValue({{ app.packet_size }}));
+    ApplicationContainer {{ app.cvar }}ClientApps =
+        {{ app.cvar }}Client.Install(nodes.Get({{ app.client_index }}));
+    {{ app.cvar }}ClientApps.Start(Seconds(0));
+    {{ app.cvar }}ClientApps.Stop(Seconds({{ app.stop }} - {{ app.start }}));
+}
+
+{% endfor %}
+{% for app in apps if app.kind == 'onoff' %}
+static void
+{{ app.cvar }}Start(NodeContainer nodes)
+{
+    // Same convergence wait as the ping helper above: the sink's address must
+    // exist, and the root must have heard from every node.
+    Ptr<rpl::RplRoutingProtocol> rootRpl =
+        nodes.Get({{ rpl.root_index }})->GetObject<rpl::RplRoutingProtocol>();
+    Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
+    if (target.IsAny() || rootRpl->GetTopologySize() + 1 < nodes.GetN())
+    {
+        Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
+        return;
+    }
+
+    OnOffHelper {{ app.cvar }}("ns3::UdpSocketFactory", Inet6SocketAddress(target, {{ app.port }}));
+    {{ app.cvar }}.SetConstantRate(DataRate("{{ app.data_rate }}"), {{ app.packet_size }});
     ApplicationContainer {{ app.cvar }}Apps = {{ app.cvar }}.Install(nodes.Get({{ app.from_index }}));
     {{ app.cvar }}Apps.Start(Seconds(0));
     {{ app.cvar }}Apps.Stop(Seconds({{ app.stop }} - {{ app.start }}));
@@ -271,6 +320,11 @@ main(int argc, char** argv)
     ApplicationContainer {{ app.cvar }}ServerApps = {{ app.cvar }}Server.Install(nodes.Get({{ app.server_index }}));
     {{ app.cvar }}ServerApps.Start(Seconds(0.0));
     {{ app.cvar }}ServerApps.Stop(Seconds({{ duration }}));
+{% if rpl %}
+    // Client scheduled rather than installed up front, since the server's
+    // SLAAC address only exists once the DODAG has settled.
+    Simulator::Schedule(Seconds({{ app.start }}), &{{ app.cvar }}Start, nodes);
+{% else %}
     UdpEchoClientHelper {{ app.cvar }}Client({{ app.target }}, {{ app.port }});
     {{ app.cvar }}Client.SetAttribute("MaxPackets", UintegerValue({{ app.max_packets }}));
     {{ app.cvar }}Client.SetAttribute("Interval", TimeValue(Seconds({{ app.interval }})));
@@ -278,6 +332,7 @@ main(int argc, char** argv)
     ApplicationContainer {{ app.cvar }}ClientApps = {{ app.cvar }}Client.Install(nodes.Get({{ app.client_index }}));
     {{ app.cvar }}ClientApps.Start(Seconds({{ app.start }}));
     {{ app.cvar }}ClientApps.Stop(Seconds({{ app.stop }}));
+{% endif %}
 {% elif app.kind == 'onoff' %}
     // App "{{ app.id }}" (OnOff -> PacketSink)
     PacketSinkHelper {{ app.cvar }}Sink("ns3::UdpSocketFactory",
@@ -285,12 +340,18 @@ main(int argc, char** argv)
     ApplicationContainer {{ app.cvar }}SinkApps = {{ app.cvar }}Sink.Install(nodes.Get({{ app.to_index }}));
     {{ app.cvar }}SinkApps.Start(Seconds(0.0));
     {{ app.cvar }}SinkApps.Stop(Seconds({{ duration }}));
+{% if rpl %}
+    // Sender scheduled rather than installed up front, since the sink's
+    // SLAAC address only exists once the DODAG has settled.
+    Simulator::Schedule(Seconds({{ app.start }}), &{{ app.cvar }}Start, nodes);
+{% else %}
     OnOffHelper {{ app.cvar }}("ns3::UdpSocketFactory",
                                {{ app.socket_addr }}({{ app.target }}, {{ app.port }}));
     {{ app.cvar }}.SetConstantRate(DataRate("{{ app.data_rate }}"), {{ app.packet_size }});
     ApplicationContainer {{ app.cvar }}Apps = {{ app.cvar }}.Install(nodes.Get({{ app.from_index }}));
     {{ app.cvar }}Apps.Start(Seconds({{ app.start }}));
     {{ app.cvar }}Apps.Stop(Seconds({{ app.stop }}));
+{% endif %}
 {% endif %}
 
 {% endfor %}

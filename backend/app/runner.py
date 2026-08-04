@@ -9,11 +9,18 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import json
 import shutil
 from pathlib import Path
 
 from .codegen import generate
 from .models import Scenario
+
+# Prefix the generated scenario puts in front of each RPL routing table
+# snapshot (see templates/scenario.cc.j2). These lines are lifted out of the
+# run log and delivered as structured messages instead: left in, they would
+# bury the readable output under one JSON object per node per sample.
+RPL_TABLE_MARKER = "##RPLTABLE## "
 
 
 class RunManager:
@@ -25,6 +32,7 @@ class RunManager:
         self.run_dir: Path | None = None
         self.exit_code: int | None = None
         self.lines: list[str] = []
+        self.rpl_tables: list[dict] = []
         self._process: asyncio.subprocess.Process | None = None
         self._listeners: set[asyncio.Queue] = set()
 
@@ -51,6 +59,7 @@ class RunManager:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.exit_code = None
         self.lines = []
+        self.rpl_tables = []
         self.state = "running"
         self._broadcast({"type": "status", **self.status()})
 
@@ -70,12 +79,34 @@ class RunManager:
         assert self._process is not None and self._process.stdout is not None
         async for raw in self._process.stdout:
             line = raw.decode(errors="replace").rstrip("\n")
+            if self._take_rpl_table(line):
+                continue
             self.lines.append(line)
             self._broadcast({"type": "line", "text": line})
         self.exit_code = await self._process.wait()
         if self.state == "running":
             self.state = "finished" if self.exit_code == 0 else "failed"
         self._broadcast({"type": "status", **self.status()})
+
+    def _take_rpl_table(self, line: str) -> bool:
+        """Record a marked RPL snapshot line; True if the line was one.
+
+        A line that carries the marker but does not parse is passed back to
+        the log rather than dropped: something went wrong with it, and the
+        run log is where a person would look to find out what.
+        """
+        start = line.find(RPL_TABLE_MARKER)
+        if start < 0:
+            return False
+        try:
+            snapshot = json.loads(line[start + len(RPL_TABLE_MARKER) :])
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(snapshot, dict):
+            return False
+        self.rpl_tables.append(snapshot)
+        self._broadcast({"type": "rplTable", "snapshot": snapshot})
+        return True
 
     async def stop(self) -> dict:
         if self._process is not None and self.state == "running":
@@ -105,7 +136,8 @@ class RunManager:
         """Return (backlog, queue): replay the backlog first, then follow."""
         queue: asyncio.Queue = asyncio.Queue()
         self._listeners.add(queue)
-        backlog = [{"type": "line", "text": line} for line in self.lines]
+        backlog: list[dict] = [{"type": "line", "text": line} for line in self.lines]
+        backlog += [{"type": "rplTable", "snapshot": s} for s in self.rpl_tables]
         backlog.append({"type": "status", **self.status()})
         return backlog, queue
 

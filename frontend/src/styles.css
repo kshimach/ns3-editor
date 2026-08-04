@@ -475,3 +475,109 @@ ul {
 .artifacts h4 {
   margin: 4px 0;
 }
+
+/* --- RPL テーブル --- */
+
+.rpl-tables {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 80px;
+}
+
+.rpl-tables.empty {
+  color: #6b7a71;
+}
+
+.rpl-controls {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rpl-controls label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rpl-controls input[type="range"] {
+  width: 220px;
+}
+
+.rpl-time {
+  min-width: 56px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.rpl-node h4,
+.rpl-topology h5,
+.rpl-node h5 {
+  margin: 0 0 6px;
+}
+
+.rpl-role {
+  font-weight: 400;
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.rpl-summary {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 0 0 12px;
+}
+
+.rpl-summary dt {
+  color: #6b7a71;
+  font-size: 12px;
+}
+
+.rpl-summary dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpl-unjoined {
+  margin: 0;
+  color: #6b7a71;
+}
+
+.rpl-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpl-table th,
+.rpl-table td {
+  text-align: left;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.rpl-table th {
+  color: #6b7a71;
+  font-weight: 600;
+}
+
+.rpl-table tr.preferred td {
+  background: var(--accent-soft);
+}
+
+.rpl-table .mono,
+.rpl-summary .mono {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+}

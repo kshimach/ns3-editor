@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, openRunSocket } from "../api";
 import { useEditor } from "../store";
-import { Issue, RunStatus } from "../types";
+import { Issue, RplSnapshot, RunStatus } from "../types";
 
 const STATE_LABELS: Record<RunStatus["state"], string> = {
   idle: "待機",
@@ -15,6 +15,8 @@ const STATE_LABELS: Record<RunStatus["state"], string> = {
 export function RunView() {
   const scenario = useEditor((s) => s.scenario);
   const setIssues = useEditor((s) => s.setIssues);
+  const addRplSnapshot = useEditor((s) => s.addRplSnapshot);
+  const clearRplSnapshots = useEditor((s) => s.clearRplSnapshots);
   const [status, setStatus] = useState<RunStatus | null>(null);
   const [lines, setLines] = useState<string[]>([]);
   const [artifacts, setArtifacts] = useState<{ name: string; size: number }[]>([]);
@@ -24,9 +26,15 @@ export function RunView() {
 
   useEffect(() => {
     const ws = openRunSocket((m) => {
-      const msg = m as { type: string; text?: string } & Partial<RunStatus>;
+      const msg = m as {
+        type: string;
+        text?: string;
+        snapshot?: RplSnapshot;
+      } & Partial<RunStatus>;
       if (msg.type === "line" && msg.text !== undefined) {
         setLines((prev) => [...prev, msg.text as string]);
+      } else if (msg.type === "rplTable" && msg.snapshot !== undefined) {
+        addRplSnapshot(msg.snapshot);
       } else if (msg.type === "status") {
         setStatus(msg as unknown as RunStatus);
         if (msg.state !== "running") {
@@ -36,6 +44,9 @@ export function RunView() {
     });
     wsRef.current = ws;
     return () => ws.close();
+    // Mounted once: the socket replays its backlog on connect, so a
+    // re-subscribe on every store change would duplicate every snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -45,6 +56,7 @@ export function RunView() {
   const start = async () => {
     setError(null);
     setLines([]);
+    clearRplSnapshots();
     const res = await api.run(scenario);
     if (res.status === 422) {
       const body = (await res.json()) as { issues: Issue[] };

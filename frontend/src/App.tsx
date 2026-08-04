@@ -8,8 +8,9 @@ import { Properties } from "./panels/Properties";
 import { SimSettings } from "./panels/SimSettings";
 import { RunView } from "./runview/RunView";
 import { useEditor } from "./store";
+import { RplTables } from "./tables/RplTables";
 
-type Tab = "settings" | "code" | "run";
+type Tab = "settings" | "code" | "run" | "rpl";
 
 export default function App() {
   const scenario = useEditor((s) => s.scenario);
@@ -102,11 +103,22 @@ export default function App() {
           <button className={tab === "run" ? "active" : ""} onClick={() => setTab("run")}>
             実行
           </button>
+          <button className={tab === "rpl" ? "active" : ""} onClick={() => setTab("rpl")}>
+            RPL テーブル
+          </button>
         </nav>
         <div className="tab-body">
+          {/*
+            RunView owns the run WebSocket, and unmounting it would close the
+            socket and stop the RPL snapshots the next tab renders from
+            arriving. Kept mounted and hidden instead.
+          */}
           {tab === "settings" && <SimSettings />}
           {tab === "code" && <CodeView />}
-          {tab === "run" && <RunView />}
+          <div style={{ display: tab === "run" ? "contents" : "none" }}>
+            <RunView />
+          </div>
+          {tab === "rpl" && <RplTables />}
         </div>
       </div>
     </div>

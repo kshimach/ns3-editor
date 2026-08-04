@@ -114,6 +114,40 @@ def test_rpl_udp_echo_and_onoff_resolve_target_at_runtime():
     assert "PacketSinkHelper app2Sink" in code
 
 
+def test_rpl_table_snapshots_scheduled_by_default():
+    code = generate(_load("rpl-line"))
+    # The marker is the whole contract with RunManager._pump(); losing it
+    # turns the snapshots back into unparsed log noise.
+    assert '"##RPLTABLE## "' in code
+    assert "PrintRoutingTableJson" in code
+    assert "&DumpRplTables" in code
+    # Self-rescheduling, so the pending event count does not grow with the
+    # run length.
+    assert code.count("Simulator::Schedule(interval, &DumpRplTables") == 1
+    # The readable end-of-run dump stays: it is what the run log carries.
+    assert "PrintDodag" in code
+
+
+def test_rpl_table_snapshots_can_be_turned_off():
+    scenario = _load("rpl-line")
+    scenario.simulation.rplTableInterval = 0
+    code = generate(scenario)
+    assert "DumpRplTables" not in code
+    assert "##RPLTABLE##" not in code
+    # ...without taking the readable dump down with them.
+    assert "PrintDodag" in code
+
+
+def test_rpl_table_interval_negative_reads_as_off():
+    scenario = _load("rpl-line")
+    scenario.simulation.rplTableInterval = -5
+    assert "DumpRplTables" not in generate(scenario)
+
+
+def test_non_rpl_scenario_has_no_table_snapshots():
+    assert "DumpRplTables" not in generate(_load("wifi-adhoc-ping"))
+
+
 def test_rpl_error_model_override_off():
     scenario = _load("rpl-line")
     scenario.networks[0].lrwpan.errorModel = False

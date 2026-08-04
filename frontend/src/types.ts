@@ -77,6 +77,8 @@ export interface Simulation {
   scale: number;
   pcap: boolean;
   logComponents: string[];
+  /** Seconds between RPL table snapshots; 0 takes one at the end of the run only. */
+  rplTableInterval: number;
 }
 
 export interface Scenario {
@@ -102,6 +104,50 @@ export interface RunStatus {
   lineCount: number;
 }
 
+/**
+ * One node's RPL state at one instant, as
+ * RplRoutingProtocol::PrintRoutingTableJson() emits it.
+ *
+ * Every field is present on every snapshot; the ones the node's configuration
+ * has nothing to say about carry null (path/link ETX under OF0, LQL when it
+ * is disabled), so nothing here needs an existence check before it is read.
+ */
+export interface RplParentEntry {
+  address: string;
+  rank: number;
+  interface: number;
+  freshness: number;
+  lastHeardAgo: number;
+  linkEtx: number | null;
+  pathEtx: number | null;
+  lql: number | null;
+}
+
+export interface RplTopologyEntry {
+  target: string;
+  parent: string;
+  pathSequence: number;
+  /** null means the route was advertised with the infinite path lifetime. */
+  expiresIn: number | null;
+}
+
+export interface RplSnapshot {
+  node: number;
+  time: number;
+  role: "root" | "router";
+  joined: boolean;
+  dodagId: string | null;
+  instance: number | null;
+  version: number | null;
+  ocp: "of0" | "mrhof" | null;
+  rank: number | null;
+  pathEtx: number | null;
+  preferredParent: string | null;
+  parents: RplParentEntry[];
+  /** Only the root holds one in non-storing mode; empty everywhere else. */
+  topology: RplTopologyEntry[];
+}
+
 export function defaultNetwork(id: string, type: NetworkType, x: number, y: number): Network {
   return {
     id,
@@ -120,7 +166,14 @@ export function defaultScenario(): Scenario {
   return {
     version: 1,
     name: "scenario",
-    simulation: { duration: 100, seed: 1, scale: 1.0, pcap: false, logComponents: [] },
+    simulation: {
+      duration: 100,
+      seed: 1,
+      scale: 1.0,
+      pcap: false,
+      logComponents: [],
+      rplTableInterval: 10,
+    },
     nodes: [],
     networks: [],
     stack: { ip: "ipv4", routing: "global", rpl: { root: "", ocp: "of0", enableLql: false } },

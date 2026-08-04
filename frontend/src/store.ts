@@ -5,6 +5,7 @@ import {
   Issue,
   Network,
   NetworkType,
+  RplSnapshot,
   Scenario,
   ScenarioNode,
   defaultNetwork,
@@ -22,11 +23,19 @@ interface EditorState {
   selection: Selection;
   issues: Issue[];
   counter: number;
+  /**
+   * RPL table snapshots from the current run, in arrival order. Kept here
+   * rather than inside RunView because the run's WebSocket lives there while
+   * the tab that renders these is a sibling of it.
+   */
+  rplSnapshots: RplSnapshot[];
 
   select: (sel: Selection) => void;
   setScenario: (s: Scenario) => void;
   setIssues: (issues: Issue[]) => void;
   updateScenario: (patch: Partial<Scenario>) => void;
+  addRplSnapshot: (snapshot: RplSnapshot) => void;
+  clearRplSnapshots: () => void;
 
   addNode: (x: number, y: number) => void;
   addSegment: (type: Exclude<NetworkType, "p2p">, x: number, y: number) => void;
@@ -52,6 +61,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   selection: null,
   issues: [],
   counter: 0,
+  rplSnapshots: [],
 
   select: (selection) => set({ selection }),
   setScenario: (scenario) => {
@@ -61,10 +71,15 @@ export const useEditor = create<EditorState>((set, get) => ({
       .filter(Boolean)
       .map(Number);
     nextId = used.length ? Math.max(...used) + 1 : 0;
-    set({ scenario, selection: null, issues: [] });
+    // The snapshots are indexed by node number, which now means a different
+    // node than it did: keeping them would label the old run's tables with
+    // the new scenario's names.
+    set({ scenario, selection: null, issues: [], rplSnapshots: [] });
   },
   setIssues: (issues) => set({ issues }),
   updateScenario: (patch) => set({ scenario: { ...get().scenario, ...patch } }),
+  addRplSnapshot: (snapshot) => set({ rplSnapshots: [...get().rplSnapshots, snapshot] }),
+  clearRplSnapshots: () => set({ rplSnapshots: [] }),
 
   addNode: (x, y) => {
     const id = `n${nextId++}`;

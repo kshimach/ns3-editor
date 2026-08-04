@@ -59,6 +59,25 @@ export function SimSettings() {
           />
           pcap を書き出す
         </label>
+        {stack.routing === "rpl" && (
+          <label title="RPL テーブルタブに表示するスナップショットの間隔。0 で実行終了時の 1 回だけ">
+            RPL テーブル取得間隔 (s)
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={sim.rplTableInterval}
+              onChange={(e) =>
+                updateScenario({
+                  simulation: {
+                    ...sim,
+                    rplTableInterval: Math.max(0, Number(e.target.value) || 0),
+                  },
+                })
+              }
+            />
+          </label>
+        )}
         <label>
           ログ (カンマ区切り)
           <input

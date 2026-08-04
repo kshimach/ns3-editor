@@ -137,6 +137,10 @@ class Simulation(BaseModel):
     scale: float = 1.0
     pcap: bool = False
     logComponents: list[str] = Field(default_factory=list)
+    # Seconds between RPL routing table snapshots. 0 takes one at the end of
+    # the run only, which is all the log used to carry. Ignored entirely
+    # unless the scenario routes with RPL.
+    rplTableInterval: float = 10.0
 
 
 class Scenario(BaseModel):

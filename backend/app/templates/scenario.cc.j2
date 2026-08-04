@@ -31,6 +31,11 @@
 {% if rpl %}
 #include "ns3/rpl-module.h"
 {% endif %}
+{% if rpl and rpl.table_interval > 0 %}
+
+#include <sstream>
+#include <string>
+{% endif %}
 
 using namespace ns3;
 
@@ -47,6 +52,39 @@ PrintDodag(NodeContainer nodes)
         rpl->PrintRoutingTable(stream);
     }
 }
+
+{% if rpl.table_interval > 0 %}
+// One line of JSON per node, behind a marker the editor's run manager picks
+// back out of the simulation's stdout. Captured into a std::ostringstream
+// and re-emitted with the marker prepended, rather than written straight to
+// std::cout, so that the marker is guaranteed to sit on the same line as the
+// object it introduces.
+static void
+DumpRplTables(NodeContainer nodes, Time interval)
+{
+    for (auto i = nodes.Begin(); i != nodes.End(); i++)
+    {
+        Ptr<rpl::RplRoutingProtocol> rpl = (*i)->GetObject<rpl::RplRoutingProtocol>();
+        if (!rpl)
+        {
+            continue;
+        }
+        std::ostringstream captured;
+        Ptr<OutputStreamWrapper> stream = Create<OutputStreamWrapper>(&captured);
+        rpl->PrintRoutingTableJson(stream);
+        std::string line = captured.str();
+        while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+        {
+            line.pop_back();
+        }
+        std::cout << "##RPLTABLE## " << line << std::endl;
+    }
+    // Reschedules itself rather than being registered up front for every
+    // sampling instant, so the number of pending events stays at one however
+    // long the run is.
+    Simulator::Schedule(interval, &DumpRplTables, nodes, interval);
+}
+{% endif %}
 
 {% if has_ping or has_udp_echo or has_onoff %}
 // With RPL every node forms its global address through SLAAC at run time, so
@@ -377,6 +415,17 @@ main(int argc, char** argv)
 
 {% endif %}
 {% if rpl %}
+{% if rpl.table_interval > 0 %}
+    // The first sample is one interval in, not at t=0: nothing has been
+    // exchanged yet at that point, so every node would report the same empty
+    // state. DumpRplTables() reschedules itself from there.
+    Simulator::Schedule(Seconds({{ rpl.table_interval }}),
+                        &DumpRplTables,
+                        nodes,
+                        Seconds({{ rpl.table_interval }}));
+{% endif %}
+    // Kept whatever the sampling interval is: this is the readable form, and
+    // it is what the run log itself carries.
     Simulator::Schedule(Seconds({{ duration }} - 1), &PrintDodag, nodes);
 
 {% endif %}

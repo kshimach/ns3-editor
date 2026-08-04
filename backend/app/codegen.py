@@ -206,6 +206,9 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
                 "root_prefix": _rpl_root_prefix(scenario),
                 "mrhof": rpl_mrhof,
                 "enable_lql": scenario.stack.rpl.enableLql,
+                # Clamped at zero so a negative interval reads as "off"
+                # rather than scheduling an event in the past forever.
+                "table_interval": max(0.0, scenario.simulation.rplTableInterval),
             }
             if rpl
             else None

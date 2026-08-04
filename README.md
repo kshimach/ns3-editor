@@ -7,6 +7,7 @@ ns-3 のシナリオをブラウザで視覚的に組み立て、C++ コード�
 - スタック設定 (IPv4/IPv6、global / static / RPL ルーティング)、アプリ (Ping / UDP Echo / OnOff)
 - 検証 → C++ 生成 (`scratch/ns3edit-<name>.cc`) → 実行 → ログを WebSocket でライブ表示
 - RPL は contrib/rpl (RFC 6550 + ETX/MRHOF + LQL) のプリセットに対応
+- RPL シナリオでは各ノードの rank・候補親テーブル・root のトポロジを実行中に時系列で参照可能
 
 ## 必要環境
 
@@ -53,7 +54,7 @@ cd ../backend && .venv/bin/uvicorn app.main:app --port 8000
 1. 左パレットからノード・セグメントを追加 (未所属ノードは自動でセグメントに参加する)
 2. 参加先の変更・PHY/MAC 設定はノードやセグメントの右クリックメニューから
 3. 下部「シナリオ設定」でスタック・アプリ・シミュレーション時間を設定
-4. 「生成コード」タブで検証+C++ プレビュー、「実行」タブで実行・ログ確認
+4. 「生成コード」タブで検証+C++ プレビュー、「実行」タブで実行・ログ確認、「RPL テーブル」タブで各ノードの RPL 状態を確認
 5. ツールバーで保存/読込 (`scenarios/*.json`)
 
 サンプル: `wifi-adhoc-ping` (IPv4 WiFi アドホック 2 ノード)、`rpl-line` (LR-WPAN 3 ノード直列、RPL MRHOF+LQL)、`rpl-mesh` (LR-WPAN 5 ノードのメッシュ、RPL MRHOF+LQL)。

@@ -205,10 +205,16 @@ ul {
   cursor: grab;
 }
 
-.device-icon {
+.device-icon-wrap {
+  position: relative;
   width: 44px;
   height: 44px;
   margin: 0 auto;
+}
+
+.device-icon {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--accent-soft);
   border: 2px solid var(--accent);
@@ -218,6 +224,36 @@ ul {
   font-weight: 700;
   color: var(--accent);
   font-size: 12px;
+}
+
+/* Approximate LR-WPAN range: an edge only, so the node underneath (and any
+   neighbour it happens to overlap) stays fully readable through it. */
+.lrwpan-range {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px dashed var(--accent);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.lrwpan-range-toggle {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.lrwpan-range-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
 }
 
 .device-node.selected .device-icon,

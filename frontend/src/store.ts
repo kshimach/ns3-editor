@@ -29,6 +29,13 @@ interface EditorState {
    * the tab that renders these is a sibling of it.
    */
   rplSnapshots: RplSnapshot[];
+  /**
+   * Whether the canvas draws the approximate LR-WPAN range ring around each
+   * member node. Purely a view preference -- it affects nothing the
+   * simulation does, so it lives here rather than on the scenario and is
+   * not saved with it.
+   */
+  showLrWpanRange: boolean;
 
   select: (sel: Selection) => void;
   setScenario: (s: Scenario) => void;
@@ -36,6 +43,7 @@ interface EditorState {
   updateScenario: (patch: Partial<Scenario>) => void;
   addRplSnapshot: (snapshot: RplSnapshot) => void;
   clearRplSnapshots: () => void;
+  toggleLrWpanRange: () => void;
 
   addNode: (x: number, y: number) => void;
   addSegment: (type: Exclude<NetworkType, "p2p">, x: number, y: number) => void;
@@ -62,6 +70,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   issues: [],
   counter: 0,
   rplSnapshots: [],
+  showLrWpanRange: true,
 
   select: (selection) => set({ selection }),
   setScenario: (scenario) => {
@@ -80,6 +89,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   updateScenario: (patch) => set({ scenario: { ...get().scenario, ...patch } }),
   addRplSnapshot: (snapshot) => set({ rplSnapshots: [...get().rplSnapshots, snapshot] }),
   clearRplSnapshots: () => set({ rplSnapshots: [] }),
+  toggleLrWpanRange: () => set({ showLrWpanRange: !get().showLrWpanRange }),
 
   addNode: (x, y) => {
     const id = `n${nextId++}`;

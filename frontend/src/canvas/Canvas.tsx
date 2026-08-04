@@ -6,6 +6,7 @@ import {
   MiniMap,
   Node as RFNode,
   NodeChange,
+  Panel,
   ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -14,6 +15,7 @@ import { MouseEvent as ReactMouseEvent, useCallback, useMemo, useState } from "r
 import { useEditor } from "../store";
 import { ContextMenu, MenuTarget } from "./ContextMenu";
 import { DeviceNode } from "./DeviceNode";
+import { lrWpanRangeMeters } from "./lrwpanRange";
 import { SegmentNode } from "./SegmentNode";
 
 const nodeTypes = { device: DeviceNode, segment: SegmentNode };
@@ -27,8 +29,15 @@ export function Canvas() {
   const removeElement = useEditor((s) => s.removeElement);
   const addP2p = useEditor((s) => s.addP2p);
   const addMember = useEditor((s) => s.addMember);
+  const showLrWpanRange = useEditor((s) => s.showLrWpanRange);
+  const toggleLrWpanRange = useEditor((s) => s.toggleLrWpanRange);
 
   const [menu, setMenu] = useState<MenuTarget | null>(null);
+
+  const hasLrWpan = useMemo(
+    () => scenario.networks.some((n) => n.type === "lrwpan"),
+    [scenario.networks],
+  );
 
   const errorIds = useMemo(
     () => new Set(issues.filter((i) => i.level === "error").map((i) => i.elementId)),
@@ -36,24 +45,40 @@ export function Canvas() {
   );
 
   const rfNodes: RFNode[] = useMemo(() => {
-    const devices: RFNode[] = scenario.nodes.map((n) => ({
-      id: n.id,
-      type: "device",
-      position: { x: n.x, y: n.y },
-      data: {
-        label: n.name || n.id,
-        // Shown on the node in place of a spoke drawn to the segment hub.
-        badges: scenario.networks
-          .filter((net) => net.type !== "p2p" && net.members.includes(n.id))
-          .map((net) => ({ id: net.id, type: net.type })),
-      },
-      selected: selection?.kind === "node" && selection.id === n.id,
-      className: errorIds.has(n.id) ? "has-error" : undefined,
-      // Explicit size so the node also shows up in the MiniMap (which does not
-      // fall back to the measured DOM size for custom nodes).
-      width: 64,
-      height: 64,
-    }));
+    const scale = scenario.simulation.scale || 1;
+    const devices: RFNode[] = scenario.nodes.map((n) => {
+      const lrwpanMemberships = scenario.networks.filter(
+        (net) => net.type === "lrwpan" && net.members.includes(n.id),
+      );
+      // A node joining more than one PAN is not something the editor steers
+      // anyone towards, but nothing rules it out either; the widest ring is
+      // the one that actually bounds where this node can be heard from.
+      const lrwpanRangePx =
+        showLrWpanRange && lrwpanMemberships.length > 0
+          ? Math.max(
+              ...lrwpanMemberships.map((net) => lrWpanRangeMeters(net.lrwpan.lossModel) / scale),
+            )
+          : null;
+      return {
+        id: n.id,
+        type: "device",
+        position: { x: n.x, y: n.y },
+        data: {
+          label: n.name || n.id,
+          // Shown on the node in place of a spoke drawn to the segment hub.
+          badges: scenario.networks
+            .filter((net) => net.type !== "p2p" && net.members.includes(n.id))
+            .map((net) => ({ id: net.id, type: net.type })),
+          lrwpanRangePx,
+        },
+        selected: selection?.kind === "node" && selection.id === n.id,
+        className: errorIds.has(n.id) ? "has-error" : undefined,
+        // Explicit size so the node also shows up in the MiniMap (which does
+        // not fall back to the measured DOM size for custom nodes).
+        width: 64,
+        height: 64,
+      };
+    });
     const segments: RFNode[] = scenario.networks
       .filter((n) => n.type !== "p2p")
       .map((n) => ({
@@ -67,7 +92,7 @@ export function Canvas() {
         height: 50,
       }));
     return [...devices, ...segments];
-  }, [scenario, selection, errorIds]);
+  }, [scenario, selection, errorIds, showLrWpanRange]);
 
   const rfEdges: Edge[] = useMemo(() => {
     const edges: Edge[] = [];
@@ -166,6 +191,18 @@ export function Canvas() {
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={20} />
+        {hasLrWpan && (
+          <Panel position="top-right" className="lrwpan-range-toggle">
+            <label>
+              <input
+                type="checkbox"
+                checked={showLrWpanRange}
+                onChange={toggleLrWpanRange}
+              />
+              LR-WPAN 通信範囲を表示
+            </label>
+          </Panel>
+        )}
         <MiniMap
           pannable
           zoomable

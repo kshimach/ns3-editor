@@ -1,3 +1,4 @@
+import { NumberField } from "../components/NumberField";
 import { freshAppId, useEditor } from "../store";
 import { App } from "../types";
 
@@ -22,33 +23,29 @@ export function SimSettings() {
         <h4>シミュレーション</h4>
         <label>
           時間 (s)
-          <input
-            type="number"
+          <NumberField
             value={sim.duration}
-            onChange={(e) =>
-              updateScenario({ simulation: { ...sim, duration: Number(e.target.value) || 1 } })
-            }
+            fallback={1}
+            min={1}
+            onCommit={(duration) => updateScenario({ simulation: { ...sim, duration } })}
           />
         </label>
         <label>
           シード
-          <input
-            type="number"
+          <NumberField
             value={sim.seed}
-            onChange={(e) =>
-              updateScenario({ simulation: { ...sim, seed: Number(e.target.value) || 1 } })
-            }
+            fallback={1}
+            min={1}
+            onCommit={(seed) => updateScenario({ simulation: { ...sim, seed } })}
           />
         </label>
         <label>
           スケール (px = m)
-          <input
-            type="number"
-            step="0.1"
+          <NumberField
             value={sim.scale}
-            onChange={(e) =>
-              updateScenario({ simulation: { ...sim, scale: Number(e.target.value) || 1 } })
-            }
+            fallback={1}
+            step="0.1"
+            onCommit={(scale) => updateScenario({ simulation: { ...sim, scale } })}
           />
         </label>
         <label>
@@ -62,18 +59,13 @@ export function SimSettings() {
         {stack.routing === "rpl" && (
           <label title="RPL テーブルタブに表示するスナップショットの間隔。0 で実行終了時の 1 回だけ">
             RPL テーブル取得間隔 (s)
-            <input
-              type="number"
-              min="0"
-              step="1"
+            <NumberField
               value={sim.rplTableInterval}
-              onChange={(e) =>
-                updateScenario({
-                  simulation: {
-                    ...sim,
-                    rplTableInterval: Math.max(0, Number(e.target.value) || 0),
-                  },
-                })
+              fallback={0}
+              min={0}
+              step="1"
+              onCommit={(rplTableInterval) =>
+                updateScenario({ simulation: { ...sim, rplTableInterval } })
               }
             />
           </label>
@@ -275,19 +267,21 @@ function AppRow({
       )}
       <label>
         開始
-        <input
-          type="number"
+        <NumberField
           value={app.start}
-          onChange={(e) => onChange(app.id, { start: Number(e.target.value) || 0 })}
+          fallback={0}
+          min={0}
+          onCommit={(start) => onChange(app.id, { start })}
         />
       </label>
       {app.type === "ping" && (
         <label>
           回数
-          <input
-            type="number"
+          <NumberField
             value={app.count}
-            onChange={(e) => onChange(app.id, { count: Number(e.target.value) || 1 } as Partial<App>)}
+            fallback={1}
+            min={1}
+            onCommit={(count) => onChange(app.id, { count } as Partial<App>)}
           />
         </label>
       )}

@@ -1,3 +1,4 @@
+import { NumberField } from "../components/NumberField";
 import { useEditor } from "../store";
 import { NETWORK_LABELS, Network } from "../types";
 
@@ -165,14 +166,12 @@ function NetworkProps({ net }: { net: Network }) {
         <>
           <label>
             PAN ID
-            <input
-              type="number"
+            <NumberField
               value={net.lrwpan.panId}
-              onChange={(e) =>
-                updateNetwork(net.id, {
-                  lrwpan: { ...net.lrwpan, panId: parseInt(e.target.value) || 1 },
-                })
-              }
+              fallback={1}
+              min={1}
+              step="1"
+              onCommit={(panId) => updateNetwork(net.id, { lrwpan: { ...net.lrwpan, panId } })}
             />
           </label>
           <label>

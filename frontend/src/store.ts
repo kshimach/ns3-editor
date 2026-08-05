@@ -30,12 +30,12 @@ interface EditorState {
    */
   rplSnapshots: RplSnapshot[];
   /**
-   * Whether the canvas draws the approximate LR-WPAN range ring around each
-   * member node. Purely a view preference -- it affects nothing the
-   * simulation does, so it lives here rather than on the scenario and is
+   * Whether the canvas draws the approximate radio range ring around each
+   * LR-WPAN/WiFi member node. Purely a view preference -- it affects nothing
+   * the simulation does, so it lives here rather than on the scenario and is
    * not saved with it.
    */
-  showLrWpanRange: boolean;
+  showRadioRange: boolean;
 
   select: (sel: Selection) => void;
   setScenario: (s: Scenario) => void;
@@ -43,7 +43,7 @@ interface EditorState {
   updateScenario: (patch: Partial<Scenario>) => void;
   addRplSnapshot: (snapshot: RplSnapshot) => void;
   clearRplSnapshots: () => void;
-  toggleLrWpanRange: () => void;
+  toggleRadioRange: () => void;
 
   addNode: (x: number, y: number) => void;
   addSegment: (type: Exclude<NetworkType, "p2p">, x: number, y: number) => void;
@@ -70,7 +70,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   issues: [],
   counter: 0,
   rplSnapshots: [],
-  showLrWpanRange: true,
+  showRadioRange: true,
 
   select: (selection) => set({ selection }),
   setScenario: (scenario) => {
@@ -89,7 +89,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   updateScenario: (patch) => set({ scenario: { ...get().scenario, ...patch } }),
   addRplSnapshot: (snapshot) => set({ rplSnapshots: [...get().rplSnapshots, snapshot] }),
   clearRplSnapshots: () => set({ rplSnapshots: [] }),
-  toggleLrWpanRange: () => set({ showLrWpanRange: !get().showLrWpanRange }),
+  toggleRadioRange: () => set({ showRadioRange: !get().showRadioRange }),
 
   addNode: (x, y) => {
     const id = `n${nextId++}`;

@@ -13,12 +13,16 @@ import "@xyflow/react/dist/style.css";
 import { MouseEvent as ReactMouseEvent, useCallback, useMemo, useState } from "react";
 
 import { useEditor } from "../store";
+import { NetworkType } from "../types";
 import { ContextMenu, MenuTarget } from "./ContextMenu";
 import { DeviceNode } from "./DeviceNode";
-import { lrWpanRangeMeters } from "./lrwpanRange";
+import { lrWpanRangeMeters, wifiRangeMeters } from "./radioRange";
 import { SegmentNode } from "./SegmentNode";
 
 const nodeTypes = { device: DeviceNode, segment: SegmentNode };
+
+/** Network types with a real, distance-dependent radio range. */
+const RADIO_TYPES: NetworkType[] = ["lrwpan", "wifiAdhoc", "wifiInfra"];
 
 export function Canvas() {
   const scenario = useEditor((s) => s.scenario);
@@ -29,13 +33,13 @@ export function Canvas() {
   const removeElement = useEditor((s) => s.removeElement);
   const addP2p = useEditor((s) => s.addP2p);
   const addMember = useEditor((s) => s.addMember);
-  const showLrWpanRange = useEditor((s) => s.showLrWpanRange);
-  const toggleLrWpanRange = useEditor((s) => s.toggleLrWpanRange);
+  const showRadioRange = useEditor((s) => s.showRadioRange);
+  const toggleRadioRange = useEditor((s) => s.toggleRadioRange);
 
   const [menu, setMenu] = useState<MenuTarget | null>(null);
 
-  const hasLrWpan = useMemo(
-    () => scenario.networks.some((n) => n.type === "lrwpan"),
+  const hasRadioSegment = useMemo(
+    () => scenario.networks.some((n) => RADIO_TYPES.includes(n.type)),
     [scenario.networks],
   );
 
@@ -47,16 +51,22 @@ export function Canvas() {
   const rfNodes: RFNode[] = useMemo(() => {
     const scale = scenario.simulation.scale || 1;
     const devices: RFNode[] = scenario.nodes.map((n) => {
-      const lrwpanMemberships = scenario.networks.filter(
-        (net) => net.type === "lrwpan" && net.members.includes(n.id),
+      const radioMemberships = scenario.networks.filter(
+        (net) => RADIO_TYPES.includes(net.type) && net.members.includes(n.id),
       );
-      // A node joining more than one PAN is not something the editor steers
-      // anyone towards, but nothing rules it out either; the widest ring is
-      // the one that actually bounds where this node can be heard from.
-      const lrwpanRangePx =
-        showLrWpanRange && lrwpanMemberships.length > 0
+      // A node joining more than one radio segment is not something the
+      // editor steers anyone towards, but nothing rules it out either; the
+      // widest ring is the one that actually bounds where this node can be
+      // heard from.
+      const rangePx =
+        showRadioRange && radioMemberships.length > 0
           ? Math.max(
-              ...lrwpanMemberships.map((net) => lrWpanRangeMeters(net.lrwpan.lossModel) / scale),
+              ...radioMemberships.map(
+                (net) =>
+                  (net.type === "lrwpan"
+                    ? lrWpanRangeMeters(net.lrwpan.lossModel)
+                    : wifiRangeMeters()) / scale,
+              ),
             )
           : null;
       return {
@@ -69,7 +79,7 @@ export function Canvas() {
           badges: scenario.networks
             .filter((net) => net.type !== "p2p" && net.members.includes(n.id))
             .map((net) => ({ id: net.id, type: net.type })),
-          lrwpanRangePx,
+          rangePx,
         },
         selected: selection?.kind === "node" && selection.id === n.id,
         className: errorIds.has(n.id) ? "has-error" : undefined,
@@ -92,7 +102,7 @@ export function Canvas() {
         height: 50,
       }));
     return [...devices, ...segments];
-  }, [scenario, selection, errorIds, showLrWpanRange]);
+  }, [scenario, selection, errorIds, showRadioRange]);
 
   const rfEdges: Edge[] = useMemo(() => {
     const edges: Edge[] = [];
@@ -191,15 +201,11 @@ export function Canvas() {
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={20} />
-        {hasLrWpan && (
-          <Panel position="top-right" className="lrwpan-range-toggle">
+        {hasRadioSegment && (
+          <Panel position="top-right" className="radio-range-toggle">
             <label>
-              <input
-                type="checkbox"
-                checked={showLrWpanRange}
-                onChange={toggleLrWpanRange}
-              />
-              LR-WPAN 通信範囲を表示
+              <input type="checkbox" checked={showRadioRange} onChange={toggleRadioRange} />
+              通信範囲を表示 (LR-WPAN / WiFi)
             </label>
           </Panel>
         )}

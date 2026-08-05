@@ -12,11 +12,11 @@ export function DeviceNode({
   data,
   selected,
 }: {
-  data: { label: string; badges?: DeviceBadge[]; lrwpanRangePx?: number | null };
+  data: { label: string; badges?: DeviceBadge[]; rangePx?: number | null };
   selected?: boolean;
 }) {
   const badges = data.badges ?? [];
-  const range = data.lrwpanRangePx;
+  const range = data.rangePx;
   return (
     <div className={`device-node${selected ? " selected" : ""}`}>
       <Handle type="target" position={Position.Top} />
@@ -30,10 +30,7 @@ export function DeviceNode({
           from clicks/drags -- only from view, which is the point.
         */}
         {range !== null && range !== undefined && (
-          <div
-            className="lrwpan-range"
-            style={{ width: range * 2, height: range * 2 }}
-          />
+          <div className="radio-range" style={{ width: range * 2, height: range * 2 }} />
         )}
         <div className="device-icon">PC</div>
       </div>

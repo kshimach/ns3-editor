@@ -86,10 +86,10 @@ DumpRplTables(NodeContainer nodes, Time interval)
 }
 {% endif %}
 
-{% if has_ping or has_udp_echo or has_onoff %}
+{% if has_ping or has_udp_echo or has_onoff or has_aodv_discover %}
 // With RPL every node forms its global address through SLAAC at run time, so
-// a ping/echo/onoff target has no address to name at configuration time;
-// resolve it once the DODAG has settled instead.
+// a ping/echo/onoff/discovery target has no address to name at configuration
+// time; resolve it once the DODAG has settled instead.
 static Ipv6Address
 Ns3EditGlobalAddressOf(Ptr<Node> node)
 {
@@ -194,6 +194,29 @@ static void
 }
 
 {% endfor %}
+{% for app in apps if app.kind == 'aodvDiscover' %}
+static void
+{{ app.cvar }}Start(NodeContainer nodes)
+{
+    // AODV-RPL (RFC 9854) route discovery: unlike ping/udpEcho/onoff this does
+    // not wait for the whole DODAG's topology to converge -- AODV-RPL floods
+    // its own RREQ-Instance independently of the DAO-built tree, so only the
+    // origin's own global address (which DiscoverRoute() needs to root the
+    // RREQ-Instance) and the target's SLAAC address (passed by value, not
+    // resolved later) have to be ready.
+    Ptr<rpl::RplRoutingProtocol> origin =
+        nodes.Get({{ app.from_index }})->GetObject<rpl::RplRoutingProtocol>();
+    Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
+    if (origin->GetGlobalAddress().IsAny() || target.IsAny())
+    {
+        Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
+        return;
+    }
+
+    origin->DiscoverRoute(target);
+}
+
+{% endfor %}
 {% endif %}
 {% endif %}
 int
@@ -284,6 +307,16 @@ main(int argc, char** argv)
 {% endif %}
 {% if rpl.enable_lql %}
     rplHelper.Set("EnableLql", BooleanValue(true));
+{% endif %}
+{% if has_aodv_discover %}
+    // AODV-RPL (RFC 9854) route-discovery tuning; see RplConfig's
+    // aodv* fields (paced much faster than the base DODAG's own Trickle
+    // timer, since a discovery has to finish inside its own 'L' lifetime).
+    rplHelper.Set("AodvDioIntervalMin", TimeValue(Seconds({{ rpl.aodv_dio_interval_min }})));
+    rplHelper.Set("AodvDioIntervalDoublings", UintegerValue({{ rpl.aodv_dio_interval_doublings }}));
+    rplHelper.Set("AodvRankLimit", UintegerValue({{ rpl.aodv_rank_limit }}));
+    rplHelper.Set("AodvLifetime", UintegerValue({{ rpl.aodv_lifetime }}));
+    rplHelper.Set("AodvRejoinReenable", TimeValue(Seconds({{ rpl.aodv_rejoin_reenable }})));
 {% endif %}
     InternetStackHelper internet;
     internet.SetRoutingHelper(rplHelper);
@@ -399,6 +432,9 @@ main(int argc, char** argv)
     {{ app.cvar }}Apps.Start(Seconds({{ app.start }}));
     {{ app.cvar }}Apps.Stop(Seconds({{ app.stop }}));
 {% endif %}
+{% elif app.kind == 'aodvDiscover' %}
+    // App "{{ app.id }}" (AODV-RPL discovery, RFC 9854)
+    Simulator::Schedule(Seconds({{ app.start }}), &{{ app.cvar }}Start, nodes);
 {% endif %}
 
 {% endfor %}

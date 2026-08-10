@@ -75,16 +75,31 @@ class Network(BaseModel):
 
 
 class RplConfig(BaseModel):
+    id: str
     root: str = ""
     ocp: Literal["of0", "mrhof"] = "of0"
     enableLql: bool = False
+    # AODV-RPL (RFC 9854) route-discovery tuning, mirrored from the defaults
+    # on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
+    # into rplHelper.Set(...) calls when the scenario actually has an
+    # aodvDiscover app (see codegen.build_context's has_aodv_discover).
+    aodvDioIntervalMin: float = 0.128
+    aodvDioIntervalDoublings: int = Field(default=4, ge=0, le=255)
+    aodvRankLimit: int = Field(default=8, ge=0, le=127)
+    aodvLifetime: int = Field(default=1, ge=0, le=3)
+    aodvRejoinReenable: float = 900.0
 
 
 class StackConfig(BaseModel):
     ip: Literal["ipv4", "ipv6"] = "ipv4"
     # global routing is IPv4-only; rpl is IPv6-only (validated in validate.py)
     routing: Literal["global", "static", "rpl"] = "global"
-    rpl: RplConfig = Field(default_factory=RplConfig)
+    # Only rpl[0] (the base DODAG instance) is actually wired into ns-3 by
+    # codegen today: contrib/rpl has no API yet to join a second RPL
+    # Instance (RFC 6550 section 5.1 local instance space). The list exists
+    # so multi-instance scenarios (AODV-RPL, P2P-RPL) don't need another
+    # breaking schema change once that lands.
+    rpl: list[RplConfig] = Field(default_factory=lambda: [RplConfig(id="rpl0")])
 
 
 class PingApp(BaseModel):
@@ -127,7 +142,25 @@ class OnOffApp(BaseModel):
     packetSize: int = 512
 
 
-App = Annotated[Union[PingApp, UdpEchoApp, OnOffApp], Field(discriminator="type")]
+class AodvDiscoverApp(BaseModel):
+    """Triggers rpl::RplRoutingProtocol::DiscoverRoute() (RFC 9854) at runtime.
+
+    A one-shot call, not a running application, so unlike the other App
+    kinds it has no stop time.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: Literal["aodvDiscover"] = "aodvDiscover"
+    id: str
+    fromNode: str = Field(alias="from")
+    to: str
+    start: float = 1.0
+
+
+App = Annotated[
+    Union[PingApp, UdpEchoApp, OnOffApp, AodvDiscoverApp], Field(discriminator="type")
+]
 
 
 class Simulation(BaseModel):

@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "name": "rpl-mesh",
+  "name": "rpl-aodv-mesh",
   "simulation": {
     "duration": 200,
     "seed": 1,
     "scale": 1.0,
-    "pcap": true,
+    "pcap": false,
     "logComponents": []
   },
   "nodes": [
@@ -28,17 +28,27 @@
   "stack": {
     "ip": "ipv6",
     "routing": "rpl",
-    "rpl": [{ "id": "rpl0", "root": "n0", "ocp": "mrhof", "enableLql": true }]
+    "rpl": [
+      {
+        "id": "rpl0",
+        "root": "n0",
+        "ocp": "mrhof",
+        "enableLql": true,
+        "aodvDioIntervalMin": 0.128,
+        "aodvDioIntervalDoublings": 4,
+        "aodvRankLimit": 8,
+        "aodvLifetime": 1,
+        "aodvRejoinReenable": 900
+      }
+    ]
   },
   "apps": [
     {
-      "type": "ping",
-      "id": "app-ping",
-      "from": "n4",
-      "to": "n0",
-      "start": 10,
-      "count": 10,
-      "interval": 2.0
+      "type": "aodvDiscover",
+      "id": "app-discover",
+      "from": "n2",
+      "to": "n3",
+      "start": 100
     }
   ]
 }

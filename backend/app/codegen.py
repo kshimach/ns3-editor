@@ -15,6 +15,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from .models import (
+    AodvDiscoverApp,
     Network,
     NetworkType,
     OnOffApp,
@@ -90,7 +91,7 @@ def _rpl_root_prefix(scenario: Scenario) -> str:
     Reuses the IPv6 base of the network the root sits on, so it matches the
     prefix the rest of that network would otherwise have been numbered from.
     """
-    root = scenario.stack.rpl.root
+    root = scenario.stack.rpl[0].root
     for i, net in enumerate(scenario.networks):
         if root in net.members:
             return f"2001:{i + 1}::"
@@ -139,8 +140,17 @@ def _app_ctx(scenario: Scenario, i: int, app, ipv6: bool) -> dict[str, Any]:
         "id": app.id,
         "kind": app.type,
         "start": app.start,
-        "stop": app.stop if app.stop is not None else duration,
     }
+    if isinstance(app, AodvDiscoverApp):
+        # One-shot DiscoverRoute() call, not an installed application: no
+        # stop time, and the target is resolved at runtime (Ns3EditGlobalAddressOf),
+        # never as a compile-time address expression.
+        common.update(
+            from_index=scenario.node_index(app.fromNode),
+            to_index=scenario.node_index(app.to),
+        )
+        return common
+    common["stop"] = app.stop if app.stop is not None else duration
     if isinstance(app, PingApp):
         common.update(
             from_index=scenario.node_index(app.fromNode),
@@ -178,12 +188,13 @@ def _app_ctx(scenario: Scenario, i: int, app, ipv6: bool) -> dict[str, Any]:
 def build_context(scenario: Scenario) -> dict[str, Any]:
     ipv6 = scenario.stack.ip == "ipv6"
     rpl = scenario.stack.routing == "rpl"
-    rpl_mrhof = rpl and scenario.stack.rpl.ocp == "mrhof"
+    rpl_mrhof = rpl and scenario.stack.rpl[0].ocp == "mrhof"
     scale = scenario.simulation.scale
 
     types = {net.type for net in scenario.networks}
     networks = [_network_ctx(scenario, i, net, rpl_mrhof) for i, net in enumerate(scenario.networks)]
     apps = [_app_ctx(scenario, i, app, ipv6) for i, app in enumerate(scenario.apps)]
+    has_aodv_discover = any(isinstance(a, AodvDiscoverApp) for a in scenario.apps)
 
     return {
         "scenario_name": scenario.name,
@@ -202,13 +213,18 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
         "ipv6": ipv6,
         "rpl": (
             {
-                "root_index": scenario.node_index(scenario.stack.rpl.root),
+                "root_index": scenario.node_index(scenario.stack.rpl[0].root),
                 "root_prefix": _rpl_root_prefix(scenario),
                 "mrhof": rpl_mrhof,
-                "enable_lql": scenario.stack.rpl.enableLql,
+                "enable_lql": scenario.stack.rpl[0].enableLql,
                 # Clamped at zero so a negative interval reads as "off"
                 # rather than scheduling an event in the past forever.
                 "table_interval": max(0.0, scenario.simulation.rplTableInterval),
+                "aodv_dio_interval_min": scenario.stack.rpl[0].aodvDioIntervalMin,
+                "aodv_dio_interval_doublings": scenario.stack.rpl[0].aodvDioIntervalDoublings,
+                "aodv_rank_limit": scenario.stack.rpl[0].aodvRankLimit,
+                "aodv_lifetime": scenario.stack.rpl[0].aodvLifetime,
+                "aodv_rejoin_reenable": scenario.stack.rpl[0].aodvRejoinReenable,
             }
             if rpl
             else None
@@ -221,6 +237,7 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
         "has_ping": any(isinstance(a, PingApp) for a in scenario.apps),
         "has_udp_echo": any(isinstance(a, UdpEchoApp) for a in scenario.apps),
         "has_onoff": any(isinstance(a, OnOffApp) for a in scenario.apps),
+        "has_aodv_discover": has_aodv_discover,
     }
 
 

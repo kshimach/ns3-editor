@@ -5,6 +5,7 @@ import {
   Issue,
   Network,
   NetworkType,
+  RplConfig,
   RplSnapshot,
   Scenario,
   ScenarioNode,
@@ -57,6 +58,9 @@ interface EditorState {
   addApp: (app: App) => void;
   updateApp: (id: string, patch: Partial<App>) => void;
   removeApp: (id: string) => void;
+  addRplInstance: (instance: RplConfig) => void;
+  updateRplInstance: (id: string, patch: Partial<RplConfig>) => void;
+  removeRplInstance: (id: string) => void;
 }
 
 let nextId = 0;
@@ -75,7 +79,12 @@ export const useEditor = create<EditorState>((set, get) => ({
   select: (selection) => set({ selection }),
   setScenario: (scenario) => {
     // Keep generated ids ahead of whatever the loaded scenario already uses.
-    const used = [...scenario.nodes, ...scenario.networks, ...scenario.apps]
+    const used = [
+      ...scenario.nodes,
+      ...scenario.networks,
+      ...scenario.apps,
+      ...scenario.stack.rpl,
+    ]
       .map((e) => /\d+$/.exec(e.id)?.[0])
       .filter(Boolean)
       .map(Number);
@@ -274,8 +283,45 @@ export const useEditor = create<EditorState>((set, get) => ({
       selection: selection?.id === id ? null : selection,
     });
   },
+
+  addRplInstance: (instance) => {
+    const { scenario } = get();
+    set({
+      scenario: {
+        ...scenario,
+        stack: { ...scenario.stack, rpl: [...scenario.stack.rpl, instance] },
+      },
+    });
+  },
+
+  updateRplInstance: (id, patch) => {
+    const { scenario } = get();
+    set({
+      scenario: {
+        ...scenario,
+        stack: {
+          ...scenario.stack,
+          rpl: scenario.stack.rpl.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+        },
+      },
+    });
+  },
+
+  removeRplInstance: (id) => {
+    const { scenario } = get();
+    set({
+      scenario: {
+        ...scenario,
+        stack: { ...scenario.stack, rpl: scenario.stack.rpl.filter((r) => r.id !== id) },
+      },
+    });
+  },
 }));
 
 export function freshAppId(): string {
   return `app${nextId++}`;
+}
+
+export function freshRplId(): string {
+  return `rpl${nextId++}`;
 }

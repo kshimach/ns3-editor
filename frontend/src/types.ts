@@ -22,15 +22,32 @@ export interface Network {
 }
 
 export interface RplConfig {
+  id: string;
   root: string;
   ocp: "of0" | "mrhof";
   enableLql: boolean;
+  /**
+   * AODV-RPL (RFC 9854) route-discovery tuning, mirrored from the defaults
+   * on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
+   * into rplHelper.Set(...) calls when the scenario has an aodvDiscover app.
+   */
+  aodvDioIntervalMin: number;
+  aodvDioIntervalDoublings: number;
+  aodvRankLimit: number;
+  aodvLifetime: number;
+  aodvRejoinReenable: number;
 }
 
 export interface StackConfig {
   ip: "ipv4" | "ipv6";
   routing: "global" | "static" | "rpl";
-  rpl: RplConfig;
+  /**
+   * Only rpl[0] (the base DODAG instance) is actually wired into ns-3 by
+   * codegen today: contrib/rpl has no API yet to join a second RPL
+   * Instance. The list exists so multi-instance scenarios (AODV-RPL,
+   * P2P-RPL) don't need another breaking schema change once that lands.
+   */
+  rpl: RplConfig[];
 }
 
 export interface PingApp {
@@ -69,7 +86,15 @@ export interface OnOffApp {
   packetSize: number;
 }
 
-export type App = PingApp | UdpEchoApp | OnOffApp;
+export interface AodvDiscoverApp {
+  type: "aodvDiscover";
+  id: string;
+  from: string;
+  to: string;
+  start: number;
+}
+
+export type App = PingApp | UdpEchoApp | OnOffApp | AodvDiscoverApp;
 
 export interface Simulation {
   duration: number;
@@ -176,7 +201,23 @@ export function defaultScenario(): Scenario {
     },
     nodes: [],
     networks: [],
-    stack: { ip: "ipv4", routing: "global", rpl: { root: "", ocp: "of0", enableLql: false } },
+    stack: {
+      ip: "ipv4",
+      routing: "global",
+      rpl: [
+        {
+          id: "rpl0",
+          root: "",
+          ocp: "of0",
+          enableLql: false,
+          aodvDioIntervalMin: 0.128,
+          aodvDioIntervalDoublings: 4,
+          aodvRankLimit: 8,
+          aodvLifetime: 1,
+          aodvRejoinReenable: 900,
+        },
+      ],
+    },
     apps: [],
   };
 }

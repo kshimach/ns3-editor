@@ -1,6 +1,6 @@
 import { NumberField } from "../components/NumberField";
-import { freshAppId, useEditor } from "../store";
-import { App } from "../types";
+import { freshAppId, freshRplId, useEditor } from "../store";
+import { App, RplConfig } from "../types";
 
 export function SimSettings() {
   const scenario = useEditor((s) => s.scenario);
@@ -8,14 +8,12 @@ export function SimSettings() {
   const addApp = useEditor((s) => s.addApp);
   const updateApp = useEditor((s) => s.updateApp);
   const removeApp = useEditor((s) => s.removeApp);
+  const addRplInstance = useEditor((s) => s.addRplInstance);
+  const updateRplInstance = useEditor((s) => s.updateRplInstance);
+  const removeRplInstance = useEditor((s) => s.removeRplInstance);
 
   const sim = scenario.simulation;
   const stack = scenario.stack;
-  const nodeOptions = scenario.nodes.map((n) => (
-    <option key={n.id} value={n.id}>
-      {n.name || n.id}
-    </option>
-  ));
 
   return (
     <div className="sim-settings">
@@ -120,46 +118,41 @@ export function SimSettings() {
           </select>
         </label>
         {stack.routing === "rpl" && (
-          <>
-            <label>
-              DODAG root
-              <select
-                value={stack.rpl.root}
-                onChange={(e) =>
-                  updateScenario({ stack: { ...stack, rpl: { ...stack.rpl, root: e.target.value } } })
-                }
-              >
-                <option value="">(未選択)</option>
-                {nodeOptions}
-              </select>
-            </label>
-            <label>
-              Objective Function
-              <select
-                value={stack.rpl.ocp}
-                onChange={(e) =>
-                  updateScenario({
-                    stack: { ...stack, rpl: { ...stack.rpl, ocp: e.target.value as "of0" | "mrhof" } },
-                  })
-                }
-              >
-                <option value="of0">OF0 (ホップ数)</option>
-                <option value="mrhof">MRHOF (ETX)</option>
-              </select>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={stack.rpl.enableLql}
-                onChange={(e) =>
-                  updateScenario({
-                    stack: { ...stack, rpl: { ...stack.rpl, enableLql: e.target.checked } },
-                  })
-                }
+          <div className="rpl-instances">
+            <p className="hint">
+              実際に ns-3 へ渡されるのは先頭 (base) instance のみです。
+              2 つ目以降は contrib/rpl 側の複数 instance 対応待ちです。
+              AODV-RPL 経路探索 (下の「アプリケーション」から追加) はこの制約と無関係に
+              base instance 上で動作します。
+            </p>
+            {stack.rpl.map((instance, i) => (
+              <RplInstanceRow
+                key={instance.id}
+                instance={instance}
+                index={i}
+                onChange={updateRplInstance}
+                onRemove={stack.rpl.length > 1 ? removeRplInstance : undefined}
               />
-              LQL (RSSI 由来) を advertise
-            </label>
-          </>
+            ))}
+            <button
+              className="tiny"
+              onClick={() =>
+                addRplInstance({
+                  id: freshRplId(),
+                  root: "",
+                  ocp: "of0",
+                  enableLql: false,
+                  aodvDioIntervalMin: 0.128,
+                  aodvDioIntervalDoublings: 4,
+                  aodvRankLimit: 8,
+                  aodvLifetime: 1,
+                  aodvRejoinReenable: 900,
+                })
+              }
+            >
+              + RPL instance
+            </button>
+          </div>
         )}
       </section>
 
@@ -217,6 +210,21 @@ export function SimSettings() {
           >
             + OnOff
           </button>
+          {stack.routing === "rpl" && (
+            <button
+              onClick={() =>
+                addApp({
+                  type: "aodvDiscover",
+                  id: freshAppId(),
+                  from: scenario.nodes[0]?.id ?? "",
+                  to: scenario.nodes[1]?.id ?? scenario.nodes[0]?.id ?? "",
+                  start: 1,
+                })
+              }
+            >
+              + AODV-RPL 探索
+            </button>
+          )}
         </div>
         {scenario.apps.map((app) => (
           <AppRow key={app.id} app={app} onChange={updateApp} onRemove={removeApp} />
@@ -249,7 +257,7 @@ function AppRow({
   return (
     <div className="app-row">
       <span className="app-kind">{app.type}</span>
-      {(app.type === "ping" || app.type === "onoff") && (
+      {(app.type === "ping" || app.type === "onoff" || app.type === "aodvDiscover") && (
         <>
           {nodeSelect(app.from, (v) => onChange(app.id, { from: v } as Partial<App>))}
           <span>から</span>
@@ -288,6 +296,123 @@ function AppRow({
       <button className="tiny danger" onClick={() => onRemove(app.id)}>
         削除
       </button>
+    </div>
+  );
+}
+
+function RplInstanceRow({
+  instance,
+  index,
+  onChange,
+  onRemove,
+}: {
+  instance: RplConfig;
+  index: number;
+  onChange: (id: string, patch: Partial<RplConfig>) => void;
+  onRemove?: (id: string) => void;
+}) {
+  const nodes = useEditor((s) => s.scenario.nodes);
+
+  return (
+    <div className="rpl-instance-row">
+      <span className="rpl-instance-label">
+        instance {index}
+        {index === 0 && " (base)"}
+      </span>
+      <label>
+        DODAG root
+        <select
+          value={instance.root}
+          onChange={(e) => onChange(instance.id, { root: e.target.value })}
+        >
+          <option value="">(未選択)</option>
+          {nodes.map((n) => (
+            <option key={n.id} value={n.id}>
+              {n.name || n.id}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Objective Function
+        <select
+          value={instance.ocp}
+          onChange={(e) => onChange(instance.id, { ocp: e.target.value as "of0" | "mrhof" })}
+        >
+          <option value="of0">OF0 (ホップ数)</option>
+          <option value="mrhof">MRHOF (ETX)</option>
+        </select>
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={instance.enableLql}
+          onChange={(e) => onChange(instance.id, { enableLql: e.target.checked })}
+        />
+        LQL (RSSI 由来) を advertise
+      </label>
+      {index === 0 && (
+        <details className="rpl-aodv-settings">
+          <summary>AODV-RPL 探索設定 (詳細)</summary>
+          <label>
+            RREQ-DIO Trickle Imin (s)
+            <NumberField
+              value={instance.aodvDioIntervalMin}
+              fallback={0.128}
+              min={0.001}
+              step="0.001"
+              onCommit={(aodvDioIntervalMin) => onChange(instance.id, { aodvDioIntervalMin })}
+            />
+          </label>
+          <label>
+            Trickle doublings
+            <NumberField
+              value={instance.aodvDioIntervalDoublings}
+              fallback={4}
+              min={0}
+              onCommit={(aodvDioIntervalDoublings) =>
+                onChange(instance.id, { aodvDioIntervalDoublings })
+              }
+            />
+          </label>
+          <label>
+            RankLimit (0 = 無制限)
+            <NumberField
+              value={instance.aodvRankLimit}
+              fallback={8}
+              min={0}
+              max={127}
+              onCommit={(aodvRankLimit) => onChange(instance.id, { aodvRankLimit })}
+            />
+          </label>
+          <label>
+            Lifetime
+            <select
+              value={instance.aodvLifetime}
+              onChange={(e) => onChange(instance.id, { aodvLifetime: Number(e.target.value) })}
+            >
+              <option value={0}>無制限</option>
+              <option value={1}>16 秒</option>
+              <option value={2}>64 秒</option>
+              <option value={3}>256 秒</option>
+            </select>
+          </label>
+          <label>
+            RejoinReenable (s)
+            <NumberField
+              value={instance.aodvRejoinReenable}
+              fallback={900}
+              min={0}
+              onCommit={(aodvRejoinReenable) => onChange(instance.id, { aodvRejoinReenable })}
+            />
+          </label>
+        </details>
+      )}
+      {onRemove && (
+        <button className="tiny danger" onClick={() => onRemove(instance.id)}>
+          削除
+        </button>
+      )}
     </div>
   );
 }

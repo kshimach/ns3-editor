@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from .models import Network, NetworkType, PingApp, OnOffApp, Scenario, UdpEchoApp
+from .models import AodvDiscoverApp, Network, NetworkType, PingApp, OnOffApp, Scenario, UdpEchoApp
 
 
 class Issue(BaseModel):
@@ -26,7 +26,7 @@ def _warn(issues: list[Issue], element_id: str | None, message: str) -> None:
 
 
 def _app_endpoints(app) -> list[str]:
-    if isinstance(app, (PingApp, OnOffApp)):
+    if isinstance(app, (PingApp, OnOffApp, AodvDiscoverApp)):
         return [app.fromNode, app.to]
     if isinstance(app, UdpEchoApp):
         return [app.client, app.server]
@@ -95,22 +95,30 @@ def _validate_stack(scenario: Scenario, node_ids: set[str], issues: list[Issue])
     if stack.routing == "rpl":
         if stack.ip != "ipv6":
             _err(issues, None, "RPL は IPv6 専用です")
-        if not stack.rpl.root:
-            _err(issues, None, "RPL の DODAG root ノードが未指定です")
-        elif stack.rpl.root not in node_ids:
-            _err(issues, None, f"RPL root '{stack.rpl.root}' が存在しません")
+        if not stack.rpl:
+            _err(issues, None, "RPL インスタンスが 1 つも定義されていません")
         else:
-            in_lrwpan = any(
-                stack.rpl.root in net.members
-                for net in scenario.networks
-                if net.type == NetworkType.LRWPAN
-            )
-            if not in_lrwpan:
-                _warn(
-                    issues,
-                    stack.rpl.root,
-                    "RPL root が lr-wpan セグメントに接続されていません",
+            # Only the base instance (index 0) is actually wired into ns-3 by
+            # codegen, so it is the only one validated here; any further
+            # instances are inert scaffolding until contrib/rpl gains a way
+            # to join a second RPL Instance.
+            base = stack.rpl[0]
+            if not base.root:
+                _err(issues, None, "RPL の DODAG root ノードが未指定です")
+            elif base.root not in node_ids:
+                _err(issues, None, f"RPL root '{base.root}' が存在しません")
+            else:
+                in_lrwpan = any(
+                    base.root in net.members
+                    for net in scenario.networks
+                    if net.type == NetworkType.LRWPAN
                 )
+                if not in_lrwpan:
+                    _warn(
+                        issues,
+                        base.root,
+                        "RPL root が lr-wpan セグメントに接続されていません",
+                    )
         if not any(net.type == NetworkType.LRWPAN for net in scenario.networks):
             _err(issues, None, "RPL には lr-wpan セグメントが少なくとも 1 つ必要です")
 
@@ -126,8 +134,11 @@ def _validate_apps(scenario: Scenario, node_ids: set[str], issues: list[Issue]) 
             _warn(issues, app.id, "送信元と宛先が同じノードです")
         if app.start >= duration:
             _warn(issues, app.id, f"開始時刻 {app.start}s がシミュレーション時間 {duration}s 以降です")
-        if app.stop is not None and app.stop <= app.start:
+        stop = getattr(app, "stop", None)  # AodvDiscoverApp is one-shot, has no stop
+        if stop is not None and stop <= app.start:
             _err(issues, app.id, "停止時刻が開始時刻以前です")
+        if isinstance(app, AodvDiscoverApp) and scenario.stack.routing != "rpl":
+            _err(issues, app.id, "AODV-RPL 経路探索には RPL ルーティングが必要です")
 
 
 def has_errors(issues: list[Issue]) -> bool:

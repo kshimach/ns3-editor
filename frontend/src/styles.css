@@ -440,6 +440,51 @@ ul {
   min-width: 60px;
 }
 
+.rpl-instances {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rpl-instance-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.rpl-instance-row label {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.rpl-instance-label {
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 70px;
+}
+
+.rpl-aodv-settings {
+  width: 100%;
+  font-size: 12px;
+}
+
+.rpl-aodv-settings summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.rpl-aodv-settings label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0 3px 12px;
+}
+
 /* --- code view --- */
 .code-view,
 .run-view {

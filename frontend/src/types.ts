@@ -170,6 +170,15 @@ export interface RplTopologyEntry {
   expiresIn: number | null;
 }
 
+/** An AODV-RPL (RFC 9854) route this node discovered via DiscoverRoute(). */
+export interface RplAodvRouteEntry {
+  target: string;
+  /** Every hop from this node outward, the target last. */
+  hops: string[];
+  rreqInstance: number;
+  expiresIn: number;
+}
+
 export interface RplSnapshot {
   node: number;
   time: number;
@@ -185,6 +194,13 @@ export interface RplSnapshot {
   parents: RplParentEntry[];
   /** Only the root holds one in non-storing mode; empty everywhere else. */
   topology: RplTopologyEntry[];
+  /**
+   * Independent of joined/topology above -- a node can hold AODV-RPL routes
+   * whichever node discovered them, root or not. Source routing (H=0) keeps
+   * no per-hop state, so only the origin of a discovery ever has an entry
+   * for that target.
+   */
+  aodvRoutes: RplAodvRouteEntry[];
 }
 
 export function defaultNetwork(id: string, type: NetworkType, x: number, y: number): Network {

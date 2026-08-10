@@ -172,6 +172,32 @@ function NodeTables({ snapshot }: { snapshot: RplSnapshot }) {
           </tbody>
         </table>
       )}
+
+      <h5>AODV-RPL 経路 ({snapshot.aodvRoutes.length})</h5>
+      {snapshot.aodvRoutes.length === 0 ? (
+        <p className="rpl-unjoined">なし</p>
+      ) : (
+        <table className="rpl-table">
+          <thead>
+            <tr>
+              <th>ターゲット</th>
+              <th>経路</th>
+              <th>RREQ-Instance</th>
+              <th>残り寿命</th>
+            </tr>
+          </thead>
+          <tbody>
+            {snapshot.aodvRoutes.map((r) => (
+              <tr key={r.target}>
+                <td className="mono">{r.target}</td>
+                <td className="mono">{r.hops.join(" -> ")}</td>
+                <td>{r.rreqInstance}</td>
+                <td>{seconds(r.expiresIn)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </section>
   );
 }

@@ -79,6 +79,20 @@ class RplConfig(BaseModel):
     root: str = ""
     ocp: Literal["of0", "mrhof"] = "of0"
     enableLql: bool = False
+    # Core RPL (RFC 6550) tuning, mirrored from the defaults on
+    # rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered into
+    # rplHelper.Set(...) calls when a value differs from that default (see
+    # codegen's build_context / scenario.cc.j2), so an untouched scenario's
+    # generated code is unaffected.
+    disInterval: float = Field(default=30.0, gt=0)
+    dioIntervalMin: float = Field(default=4.096, gt=0)
+    dioIntervalDoublings: int = Field(default=8, ge=0, le=255)
+    dioRedundancy: int = Field(default=0, ge=0, le=255)
+    minHopRankIncrease: int = Field(default=128, ge=1, le=65535)
+    daoInterval: float = Field(default=60.0, gt=0)
+    daoAckTimeout: float = Field(default=5.0, gt=0)
+    daoRetries: int = Field(default=3, ge=0, le=255)
+    pathLifetime: int = Field(default=30, ge=1, le=255)
     # AODV-RPL (RFC 9854) route-discovery tuning, mirrored from the defaults
     # on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
     # into rplHelper.Set(...) calls when the scenario actually has an

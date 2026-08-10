@@ -308,6 +308,36 @@ main(int argc, char** argv)
 {% if rpl.enable_lql %}
     rplHelper.Set("EnableLql", BooleanValue(true));
 {% endif %}
+{# Compared against rpl::RplRoutingProtocol::GetTypeId()'s own defaults; only
+   emitted when the scenario actually changed one, so an untouched RPL
+   scenario's generated code stays as small as it was before these existed. #}
+{% if rpl.dis_interval != 30.0 %}
+    rplHelper.Set("DisInterval", TimeValue(Seconds({{ rpl.dis_interval }})));
+{% endif %}
+{% if rpl.dio_interval_min != 4.096 %}
+    rplHelper.Set("DioIntervalMin", TimeValue(Seconds({{ rpl.dio_interval_min }})));
+{% endif %}
+{% if rpl.dio_interval_doublings != 8 %}
+    rplHelper.Set("DioIntervalDoublings", UintegerValue({{ rpl.dio_interval_doublings }}));
+{% endif %}
+{% if rpl.dio_redundancy != 0 %}
+    rplHelper.Set("DioRedundancy", UintegerValue({{ rpl.dio_redundancy }}));
+{% endif %}
+{% if rpl.min_hop_rank_increase != 128 %}
+    rplHelper.Set("MinHopRankIncrease", UintegerValue({{ rpl.min_hop_rank_increase }}));
+{% endif %}
+{% if rpl.dao_interval != 60.0 %}
+    rplHelper.Set("DaoInterval", TimeValue(Seconds({{ rpl.dao_interval }})));
+{% endif %}
+{% if rpl.dao_ack_timeout != 5.0 %}
+    rplHelper.Set("DaoAckTimeout", TimeValue(Seconds({{ rpl.dao_ack_timeout }})));
+{% endif %}
+{% if rpl.dao_retries != 3 %}
+    rplHelper.Set("DaoRetries", UintegerValue({{ rpl.dao_retries }}));
+{% endif %}
+{% if rpl.path_lifetime != 30 %}
+    rplHelper.Set("PathLifetime", UintegerValue({{ rpl.path_lifetime }}));
+{% endif %}
 {% if has_aodv_discover %}
     // AODV-RPL (RFC 9854) route-discovery tuning; see RplConfig's
     // aodv* fields (paced much faster than the base DODAG's own Trickle

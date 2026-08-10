@@ -220,6 +220,15 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
                 # Clamped at zero so a negative interval reads as "off"
                 # rather than scheduling an event in the past forever.
                 "table_interval": max(0.0, scenario.simulation.rplTableInterval),
+                "dis_interval": scenario.stack.rpl[0].disInterval,
+                "dio_interval_min": scenario.stack.rpl[0].dioIntervalMin,
+                "dio_interval_doublings": scenario.stack.rpl[0].dioIntervalDoublings,
+                "dio_redundancy": scenario.stack.rpl[0].dioRedundancy,
+                "min_hop_rank_increase": scenario.stack.rpl[0].minHopRankIncrease,
+                "dao_interval": scenario.stack.rpl[0].daoInterval,
+                "dao_ack_timeout": scenario.stack.rpl[0].daoAckTimeout,
+                "dao_retries": scenario.stack.rpl[0].daoRetries,
+                "path_lifetime": scenario.stack.rpl[0].pathLifetime,
                 "aodv_dio_interval_min": scenario.stack.rpl[0].aodvDioIntervalMin,
                 "aodv_dio_interval_doublings": scenario.stack.rpl[0].aodvDioIntervalDoublings,
                 "aodv_rank_limit": scenario.stack.rpl[0].aodvRankLimit,

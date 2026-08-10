@@ -102,8 +102,27 @@ LR-WPAN のエラーモデルを「自動」にすると、RPL が MRHOF (ETX �
   将来 contrib/rpl 側が複数 RPL Instance の join に対応した際のための空の枠で、
   今追加しても生成コード・シミュレーションには影響しない。
 
-  base instance の行には「AODV-RPL 探索設定 (詳細)」という折りたたみがある。
-  下記の AODV-RPL 探索アプリが使う Trickle・RankLimit・寿命のパラメータで、
+  base instance の行には「RPL 詳細設定 (Trickle/DAO)」という折りたたみがある。
+  RFC 6550 の core RPL パラメータで、contrib/rpl (`rpl::RplRoutingProtocol`)
+  のデフォルト値と一致する値のままなら生成コードには一切現れない (値を変えた
+  項目だけ `rplHelper.Set(...)` として出る):
+  - **DIS 送信間隔 (s)**: DODAG 未参加時に撒く unsolicited DIS の周期 (既定 30s)
+  - **DIO Trickle Imin / doublings**: DIO Trickle タイマーの最小間隔と、
+    最大間隔 (Imax = Imin << doublings) までの倍化回数 (既定 4.096s / 8 =
+    Imax 約17.5分)。root のみがこの値を使い、他ノードは join した DIO の
+    DODAG Configuration オプションから引き継ぐ
+  - **DIO Trickle redundancy k**: 0 で抑制なし (既定)。Trickle の一貫性カウント
+    による送信抑制のしきい値
+  - **MinHopRankIncrease**: root の rank でもある、1 ホップあたりの rank
+    増分 (既定 128)
+  - **DAO 再送間隔・DAO-ACK タイムアウト・DAO 再送回数**: 下り経路を root に
+    伝える DAO の再送スケジュール (既定 60s / 5s / 3 回)
+  - **下り経路の寿命 (lifetime units)**: DAO が広告する経路の寿命
+    (既定 30 unit。1 unit = 60 秒固定、contrib/rpl 側で unit 自体は
+    attribute 化されていない)
+
+  base instance の行にはもう1つ「AODV-RPL 探索設定 (詳細)」という折りたたみも
+  ある。下記の AODV-RPL 探索アプリが使う Trickle・RankLimit・寿命のパラメータで、
   探索アプリを 1 つも追加していないシナリオでは生成コードに一切現れない。
 
 ### アプリケーション

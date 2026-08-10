@@ -142,6 +142,15 @@ export function SimSettings() {
                   root: "",
                   ocp: "of0",
                   enableLql: false,
+                  disInterval: 30,
+                  dioIntervalMin: 4.096,
+                  dioIntervalDoublings: 8,
+                  dioRedundancy: 0,
+                  minHopRankIncrease: 128,
+                  daoInterval: 60,
+                  daoAckTimeout: 5,
+                  daoRetries: 3,
+                  pathLifetime: 30,
                   aodvDioIntervalMin: 0.128,
                   aodvDioIntervalDoublings: 4,
                   aodvRankLimit: 8,
@@ -351,6 +360,100 @@ function RplInstanceRow({
         />
         LQL (RSSI 由来) を advertise
       </label>
+      {index === 0 && (
+        <details className="rpl-aodv-settings">
+          <summary>RPL 詳細設定 (Trickle/DAO)</summary>
+          <label>
+            DIS 送信間隔 (s)
+            <NumberField
+              value={instance.disInterval}
+              fallback={30}
+              min={0.001}
+              onCommit={(disInterval) => onChange(instance.id, { disInterval })}
+            />
+          </label>
+          <label>
+            DIO Trickle Imin (s)
+            <NumberField
+              value={instance.dioIntervalMin}
+              fallback={4.096}
+              min={0.001}
+              step="0.001"
+              onCommit={(dioIntervalMin) => onChange(instance.id, { dioIntervalMin })}
+            />
+          </label>
+          <label>
+            DIO Trickle doublings
+            <NumberField
+              value={instance.dioIntervalDoublings}
+              fallback={8}
+              min={0}
+              onCommit={(dioIntervalDoublings) =>
+                onChange(instance.id, { dioIntervalDoublings })
+              }
+            />
+          </label>
+          <label>
+            DIO Trickle redundancy k (0 = 抑制なし)
+            <NumberField
+              value={instance.dioRedundancy}
+              fallback={0}
+              min={0}
+              onCommit={(dioRedundancy) => onChange(instance.id, { dioRedundancy })}
+            />
+          </label>
+          <label>
+            MinHopRankIncrease
+            <NumberField
+              value={instance.minHopRankIncrease}
+              fallback={128}
+              min={1}
+              max={65535}
+              onCommit={(minHopRankIncrease) =>
+                onChange(instance.id, { minHopRankIncrease })
+              }
+            />
+          </label>
+          <label>
+            DAO 再送間隔 (s)
+            <NumberField
+              value={instance.daoInterval}
+              fallback={60}
+              min={0.001}
+              onCommit={(daoInterval) => onChange(instance.id, { daoInterval })}
+            />
+          </label>
+          <label>
+            DAO-ACK タイムアウト (s)
+            <NumberField
+              value={instance.daoAckTimeout}
+              fallback={5}
+              min={0.001}
+              onCommit={(daoAckTimeout) => onChange(instance.id, { daoAckTimeout })}
+            />
+          </label>
+          <label>
+            DAO 再送回数
+            <NumberField
+              value={instance.daoRetries}
+              fallback={3}
+              min={0}
+              max={255}
+              onCommit={(daoRetries) => onChange(instance.id, { daoRetries })}
+            />
+          </label>
+          <label>
+            下り経路の寿命 (lifetime units)
+            <NumberField
+              value={instance.pathLifetime}
+              fallback={30}
+              min={1}
+              max={255}
+              onCommit={(pathLifetime) => onChange(instance.id, { pathLifetime })}
+            />
+          </label>
+        </details>
+      )}
       {index === 0 && (
         <details className="rpl-aodv-settings">
           <summary>AODV-RPL 探索設定 (詳細)</summary>

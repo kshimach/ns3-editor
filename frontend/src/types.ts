@@ -27,6 +27,20 @@ export interface RplConfig {
   ocp: "of0" | "mrhof";
   enableLql: boolean;
   /**
+   * Core RPL (RFC 6550) tuning, mirrored from the defaults on
+   * rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered into
+   * rplHelper.Set(...) calls when a value differs from that default.
+   */
+  disInterval: number;
+  dioIntervalMin: number;
+  dioIntervalDoublings: number;
+  dioRedundancy: number;
+  minHopRankIncrease: number;
+  daoInterval: number;
+  daoAckTimeout: number;
+  daoRetries: number;
+  pathLifetime: number;
+  /**
    * AODV-RPL (RFC 9854) route-discovery tuning, mirrored from the defaults
    * on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
    * into rplHelper.Set(...) calls when the scenario has an aodvDiscover app.
@@ -210,6 +224,15 @@ export function defaultScenario(): Scenario {
           root: "",
           ocp: "of0",
           enableLql: false,
+          disInterval: 30,
+          dioIntervalMin: 4.096,
+          dioIntervalDoublings: 8,
+          dioRedundancy: 0,
+          minHopRankIncrease: 128,
+          daoInterval: 60,
+          daoAckTimeout: 5,
+          daoRetries: 3,
+          pathLifetime: 30,
           aodvDioIntervalMin: 0.128,
           aodvDioIntervalDoublings: 4,
           aodvRankLimit: 8,

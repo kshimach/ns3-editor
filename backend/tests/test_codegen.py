@@ -215,6 +215,51 @@ def test_rpl_of0_no_error_model():
     assert "RPL_OCP_MRHOF" not in code
 
 
+def test_rpl_core_attributes_default_to_no_extra_set_calls():
+    # An untouched scenario's generated code must stay as small as it was
+    # before these 9 attributes existed on RplConfig.
+    code = generate(_load("rpl-line"))
+    for name in (
+        "DisInterval",
+        "DioIntervalMin",
+        "DioIntervalDoublings",
+        "DioRedundancy",
+        "MinHopRankIncrease",
+        "DaoInterval",
+        "DaoAckTimeout",
+        "DaoRetries",
+        "PathLifetime",
+    ):
+        assert f'rplHelper.Set("{name}"' not in code
+
+
+def test_rpl_core_attributes_rendered_when_non_default():
+    scenario = _load("rpl-line")
+    base = scenario.stack.rpl[0]
+    # Explicit floats for the Time-typed fields: direct attribute assignment
+    # on an already-constructed model bypasses Pydantic's int -> float
+    # coercion (only model_validate() does that), unlike a real request body.
+    base.disInterval = 15.0
+    base.dioIntervalMin = 2.048
+    base.dioIntervalDoublings = 4
+    base.dioRedundancy = 10
+    base.minHopRankIncrease = 256
+    base.daoInterval = 30.0
+    base.daoAckTimeout = 2.0
+    base.daoRetries = 5
+    base.pathLifetime = 60
+    code = generate(scenario)
+    assert 'rplHelper.Set("DisInterval", TimeValue(Seconds(15.0)));' in code
+    assert 'rplHelper.Set("DioIntervalMin", TimeValue(Seconds(2.048)));' in code
+    assert 'rplHelper.Set("DioIntervalDoublings", UintegerValue(4));' in code
+    assert 'rplHelper.Set("DioRedundancy", UintegerValue(10));' in code
+    assert 'rplHelper.Set("MinHopRankIncrease", UintegerValue(256));' in code
+    assert 'rplHelper.Set("DaoInterval", TimeValue(Seconds(30.0)));' in code
+    assert 'rplHelper.Set("DaoAckTimeout", TimeValue(Seconds(2.0)));' in code
+    assert 'rplHelper.Set("DaoRetries", UintegerValue(5));' in code
+    assert 'rplHelper.Set("PathLifetime", UintegerValue(60));' in code
+
+
 def test_rpl_requires_ipv6():
     scenario = _load("rpl-line")
     scenario.stack.ip = "ipv4"

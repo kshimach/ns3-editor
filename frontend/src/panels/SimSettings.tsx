@@ -122,7 +122,7 @@ export function SimSettings() {
             <p className="hint">
               実際に ns-3 へ渡されるのは先頭 (base) instance のみです。
               2 つ目以降は contrib/rpl 側の複数 instance 対応待ちです。
-              AODV-RPL 経路探索 (下の「アプリケーション」から追加) はこの制約と無関係に
+              AODV-RPL / P2P-RPL 経路探索 (下の「アプリケーション」から追加) はこの制約と無関係に
               base instance 上で動作します。
             </p>
             {stack.rpl.map((instance, i) => (
@@ -156,6 +156,14 @@ export function SimSettings() {
                   aodvRankLimit: 8,
                   aodvLifetime: 1,
                   aodvRejoinReenable: 900,
+                  p2pDioIntervalMin: 0.064,
+                  p2pDioIntervalDoublings: 4,
+                  p2pDioRedundancy: 1,
+                  p2pMaxRank: 8,
+                  p2pLifetime: 2,
+                  p2pDroAckRequested: true,
+                  p2pDroAckWaitTime: 1,
+                  p2pDroMaxRetransmissions: 3,
                 })
               }
             >
@@ -234,6 +242,21 @@ export function SimSettings() {
               + AODV-RPL 探索
             </button>
           )}
+          {stack.routing === "rpl" && (
+            <button
+              onClick={() =>
+                addApp({
+                  type: "p2pDiscover",
+                  id: freshAppId(),
+                  from: scenario.nodes[0]?.id ?? "",
+                  to: scenario.nodes[1]?.id ?? scenario.nodes[0]?.id ?? "",
+                  start: 1,
+                })
+              }
+            >
+              + P2P-RPL 探索
+            </button>
+          )}
         </div>
         {scenario.apps.map((app) => (
           <AppRow key={app.id} app={app} onChange={updateApp} onRemove={removeApp} />
@@ -266,7 +289,10 @@ function AppRow({
   return (
     <div className="app-row">
       <span className="app-kind">{app.type}</span>
-      {(app.type === "ping" || app.type === "onoff" || app.type === "aodvDiscover") && (
+      {(app.type === "ping" ||
+        app.type === "onoff" ||
+        app.type === "aodvDiscover" ||
+        app.type === "p2pDiscover") && (
         <>
           {nodeSelect(app.from, (v) => onChange(app.id, { from: v } as Partial<App>))}
           <span>から</span>
@@ -507,6 +533,96 @@ function RplInstanceRow({
               fallback={900}
               min={0}
               onCommit={(aodvRejoinReenable) => onChange(instance.id, { aodvRejoinReenable })}
+            />
+          </label>
+        </details>
+      )}
+      {index === 0 && (
+        <details className="rpl-aodv-settings">
+          <summary>P2P-RPL 探索設定 (詳細)</summary>
+          <label>
+            P2P mode DIO Trickle Imin (s)
+            <NumberField
+              value={instance.p2pDioIntervalMin}
+              fallback={0.064}
+              min={0.001}
+              step="0.001"
+              onCommit={(p2pDioIntervalMin) => onChange(instance.id, { p2pDioIntervalMin })}
+            />
+          </label>
+          <label>
+            Trickle doublings
+            <NumberField
+              value={instance.p2pDioIntervalDoublings}
+              fallback={4}
+              min={0}
+              onCommit={(p2pDioIntervalDoublings) =>
+                onChange(instance.id, { p2pDioIntervalDoublings })
+              }
+            />
+          </label>
+          <label>
+            Trickle redundancy k
+            <NumberField
+              value={instance.p2pDioRedundancy}
+              fallback={1}
+              min={0}
+              max={255}
+              onCommit={(p2pDioRedundancy) => onChange(instance.id, { p2pDioRedundancy })}
+            />
+          </label>
+          <label>
+            MaxRank (0 = 無制限)
+            <NumberField
+              value={instance.p2pMaxRank}
+              fallback={8}
+              min={0}
+              max={63}
+              onCommit={(p2pMaxRank) => onChange(instance.id, { p2pMaxRank })}
+            />
+          </label>
+          <label>
+            Lifetime
+            <select
+              value={instance.p2pLifetime}
+              onChange={(e) => onChange(instance.id, { p2pLifetime: Number(e.target.value) })}
+            >
+              <option value={0}>1 秒</option>
+              <option value={1}>4 秒</option>
+              <option value={2}>16 秒</option>
+              <option value={3}>64 秒</option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={instance.p2pDroAckRequested}
+              onChange={(e) =>
+                onChange(instance.id, { p2pDroAckRequested: e.target.checked })
+              }
+            />
+            P2P-DRO-ACK を要求
+          </label>
+          <label>
+            P2P-DRO-ACK 待ち時間 (s)
+            <NumberField
+              value={instance.p2pDroAckWaitTime}
+              fallback={1}
+              min={0.001}
+              step="0.001"
+              onCommit={(p2pDroAckWaitTime) => onChange(instance.id, { p2pDroAckWaitTime })}
+            />
+          </label>
+          <label>
+            P2P-DRO 再送回数
+            <NumberField
+              value={instance.p2pDroMaxRetransmissions}
+              fallback={3}
+              min={0}
+              max={255}
+              onCommit={(p2pDroMaxRetransmissions) =>
+                onChange(instance.id, { p2pDroMaxRetransmissions })
+              }
             />
           </label>
         </details>

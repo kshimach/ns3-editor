@@ -22,7 +22,7 @@ def _load(name: str) -> Scenario:
 
 
 def test_samples_validate_clean():
-    for name in ("wifi-adhoc-ping", "rpl-line", "rpl-mesh", "rpl-aodv-mesh"):
+    for name in ("wifi-adhoc-ping", "rpl-line", "rpl-mesh", "rpl-aodv-mesh", "rpl-p2p-mesh"):
         issues = validate_scenario(_load(name))
         assert not has_errors(issues), [i.message for i in issues]
 
@@ -34,6 +34,16 @@ def test_rpl_aodv_mesh_sample_generates():
     code = generate(_load("rpl-aodv-mesh"))
     assert "origin->DiscoverRoute(target);" in code
     assert 'rplHelper.Set("AodvRankLimit", UintegerValue(8));' in code
+
+
+def test_rpl_p2p_mesh_sample_generates():
+    # Confirmed against a real ./ns3 run (not just codegen): the discovery
+    # from "b" to "c" completes over a direct 1-hop peer link neither node's
+    # base DODAG tree route would ever use on its own -- same topology as
+    # rpl-aodv-mesh, same physical link, a different protocol finding it.
+    code = generate(_load("rpl-p2p-mesh"))
+    assert "origin->DiscoverP2pRoute(target);" in code
+    assert 'rplHelper.Set("P2pMaxRank", UintegerValue(8));' in code
 
 
 def test_wifi_adhoc_ping_structure():

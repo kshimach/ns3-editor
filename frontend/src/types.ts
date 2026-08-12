@@ -50,6 +50,19 @@ export interface RplConfig {
   aodvRankLimit: number;
   aodvLifetime: number;
   aodvRejoinReenable: number;
+  /**
+   * P2P-RPL (RFC 6997) route-discovery tuning, mirrored from the defaults
+   * on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
+   * into rplHelper.Set(...) calls when the scenario has a p2pDiscover app.
+   */
+  p2pDioIntervalMin: number;
+  p2pDioIntervalDoublings: number;
+  p2pDioRedundancy: number;
+  p2pMaxRank: number;
+  p2pLifetime: number;
+  p2pDroAckRequested: boolean;
+  p2pDroAckWaitTime: number;
+  p2pDroMaxRetransmissions: number;
 }
 
 export interface StackConfig {
@@ -108,7 +121,15 @@ export interface AodvDiscoverApp {
   start: number;
 }
 
-export type App = PingApp | UdpEchoApp | OnOffApp | AodvDiscoverApp;
+export interface P2pDiscoverApp {
+  type: "p2pDiscover";
+  id: string;
+  from: string;
+  to: string;
+  start: number;
+}
+
+export type App = PingApp | UdpEchoApp | OnOffApp | AodvDiscoverApp | P2pDiscoverApp;
 
 export interface Simulation {
   duration: number;
@@ -179,6 +200,15 @@ export interface RplAodvRouteEntry {
   expiresIn: number;
 }
 
+/** A P2P-RPL (RFC 6997) route this node discovered via DiscoverP2pRoute(). */
+export interface RplP2pRouteEntry {
+  target: string;
+  /** Every hop from this node outward, the target last. */
+  hops: string[];
+  instance: number;
+  expiresIn: number;
+}
+
 export interface RplSnapshot {
   node: number;
   time: number;
@@ -201,6 +231,8 @@ export interface RplSnapshot {
    * for that target.
    */
   aodvRoutes: RplAodvRouteEntry[];
+  /** P2P-RPL's own equivalent of aodvRoutes above, same H=0 caveat. */
+  p2pRoutes: RplP2pRouteEntry[];
 }
 
 export function defaultNetwork(id: string, type: NetworkType, x: number, y: number): Network {
@@ -254,6 +286,14 @@ export function defaultScenario(): Scenario {
           aodvRankLimit: 8,
           aodvLifetime: 1,
           aodvRejoinReenable: 900,
+          p2pDioIntervalMin: 0.064,
+          p2pDioIntervalDoublings: 4,
+          p2pDioRedundancy: 1,
+          p2pMaxRank: 8,
+          p2pLifetime: 2,
+          p2pDroAckRequested: true,
+          p2pDroAckWaitTime: 1,
+          p2pDroMaxRetransmissions: 3,
         },
       ],
     },

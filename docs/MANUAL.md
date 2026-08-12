@@ -125,6 +125,10 @@ LR-WPAN のエラーモデルを「自動」にすると、RPL が MRHOF (ETX �
   ある。下記の AODV-RPL 探索アプリが使う Trickle・RankLimit・寿命のパラメータで、
   探索アプリを 1 つも追加していないシナリオでは生成コードに一切現れない。
 
+  同様に「P2P-RPL 探索設定 (詳細)」という折りたたみもある。下記の P2P-RPL
+  探索アプリが使う Trickle・MaxRank・寿命・P2P-DRO-ACK のパラメータで、
+  こちらも探索アプリを 1 つも追加していないシナリオでは生成コードに一切現れない。
+
 ### アプリケーション
 
 「+ Ping」「+ UDP Echo」「+ OnOff」で追加。追加された行で編集できるのは送信元/宛先ノードと開始時刻、Ping はそれに加えて回数。パケット間隔・サイズ・データレートなどそれ以外のパラメータは追加時のデフォルト値のままになる (Ping: 5 回・1 秒間隔。UDP Echo: 10 パケット・1 秒間隔・64 バイト・port 9。OnOff: 500kbps・512 バイト・port 9000)。細かく調整したい場合はシナリオ保存後、`scenarios/<name>.json` を直接編集して読み込み直す。
@@ -147,6 +151,17 @@ base DODAG の経路より先に AODV-RPL の経路を見る) ので、探索が
 残り寿命)。source routing (H=0) なので中継ノードやターゲット自身には何も
 残らず、その表は起点ノードでだけ埋まる。詳しい探索の様子を追いたければ
 ログコンポーネントに `RplAodv` を足せば `NS_LOG` 経由でも見られる。
+
+**「+ P2P-RPL 探索」** (ルーティングが RPL のときだけ表示): RFC 6997
+P2P-RPL の経路探索を起動する。挙動は「+ AODV-RPL 探索」とほぼ同じ —
+起点ノード・ターゲットノード・開始時刻を指定すると、生成コードは起点ノードで
+`RplRoutingProtocol::DiscoverP2pRoute()` を呼ぶ (base DODAG の収束を待たず、
+自分専用の一時 DAG を flood して経路を探す)。見つかった経路は自動的に
+以後の通信に使われ、起点ノードの「RPL テーブル」タブに「P2P-RPL 経路」として
+表示される (ターゲット・経路・temporary DAG instance・残り寿命)。こちらも
+source routing (H=0) のみで、H=1 (`DiscoverP2pRoute()` 自身の hopByHop 引数)
+はまだこの UI から選べない。ログコンポーネントに `RplP2p` を足せば詳しい
+探索の様子が見られる。
 
 ## 検証・生成・実行
 
@@ -183,6 +198,7 @@ base DODAG の経路より先に AODV-RPL の経路を見る) ので、探索が
 - `rpl-line` — LR-WPAN 3 ノード直列、RPL MRHOF+LQL、Ping
 - `rpl-mesh` — LR-WPAN 5 ノードのメッシュ (隣接 50m、LR-WPAN の到達範囲内)、RPL MRHOF+LQL、Ping。DODAG がきちんと収束する配置の実例
 - `rpl-aodv-mesh` — `rpl-mesh` と同じ配置、AODV-RPL 探索 ("b" から "c" へ)。base DODAG の木では root 経由の 4 ホップになる 2 ノード間が、AODV-RPL では直接 1 ホップの経路として見つかる実例 (`./ns3 run` で実際に確認済み)
+- `rpl-p2p-mesh` — `rpl-aodv-mesh` と全く同じ配置・同じ 2 ノード間、探索プロトコルだけ P2P-RPL に差し替えた版。同じ直接 1 ホップの経路が見つかる (`./ns3 run` で実際に確認済み)
 
 ## 生成コードを直接触りたいとき
 

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from app.codegen import CodegenError, generate
-from app.models import AodvDiscoverApp, OnOffApp, Scenario, UdpEchoApp
+from app.models import AodvDiscoverApp, OnOffApp, P2pDiscoverApp, Scenario, UdpEchoApp
 from app.validate import has_errors, validate_scenario
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
@@ -165,6 +165,53 @@ def test_rpl_aodv_attributes_only_rendered_when_discovery_present():
     assert 'rplHelper.Set("AodvRankLimit", UintegerValue(20));' in code
     assert 'rplHelper.Set("AodvLifetime", UintegerValue(2));' in code
     assert 'rplHelper.Set("AodvRejoinReenable", TimeValue(Seconds(900.0)));' in code
+
+
+def test_rpl_p2p_discover_structure():
+    scenario = _load("rpl-line")
+    scenario.apps.append(P2pDiscoverApp(id="app-discover", **{"from": "n2"}, to="n0", start=100))
+    code = generate(scenario)
+
+    assert "app1Start(NodeContainer nodes)" in code
+    assert "nodes.Get(2)->GetObject<rpl::RplRoutingProtocol>();" in code
+    assert "Ns3EditGlobalAddressOf(nodes.Get(0))" in code
+    assert "origin->GetGlobalAddress().IsAny()" in code
+    assert "origin->DiscoverP2pRoute(target);" in code
+    assert "Simulator::Schedule(Seconds(100.0), &app1Start, nodes);" in code
+
+    # Unlike ping/udpEcho/onoff, discovery does not wait for the base
+    # DODAG's DAO-built topology to converge -- it floods its own
+    # temporary DAG independently of it.
+    start = code.index("app1Start(NodeContainer nodes)")
+    end = code.index("int\nmain(int argc")
+    assert "GetTopologySize" not in code[start:end]
+
+
+def test_rpl_p2p_discover_requires_rpl_routing():
+    scenario = _load("wifi-adhoc-ping")
+    scenario.apps.append(P2pDiscoverApp(id="app-discover", **{"from": "n0"}, to="n1"))
+    with pytest.raises(CodegenError):
+        generate(scenario)
+
+
+def test_rpl_p2p_attributes_only_rendered_when_discovery_present():
+    # Base RPL scenarios with no discovery app should not carry the P2P-RPL
+    # Trickle/lifetime tuning knobs -- they would just be dead configuration.
+    assert "P2pDio" not in generate(_load("rpl-line"))
+
+    scenario = _load("rpl-line")
+    scenario.stack.rpl[0].p2pMaxRank = 20
+    scenario.stack.rpl[0].p2pLifetime = 1
+    scenario.apps.append(P2pDiscoverApp(id="app-discover", **{"from": "n2"}, to="n0"))
+    code = generate(scenario)
+    assert 'rplHelper.Set("P2pDioIntervalMin", TimeValue(Seconds(0.064)));' in code
+    assert 'rplHelper.Set("P2pDioIntervalDoublings", UintegerValue(4));' in code
+    assert 'rplHelper.Set("P2pDioRedundancy", UintegerValue(1));' in code
+    assert 'rplHelper.Set("P2pMaxRank", UintegerValue(20));' in code
+    assert 'rplHelper.Set("P2pLifetime", UintegerValue(1));' in code
+    assert 'rplHelper.Set("P2pDroAckRequested", BooleanValue(true));' in code
+    assert 'rplHelper.Set("P2pDroAckWaitTime", TimeValue(Seconds(1.0)));' in code
+    assert 'rplHelper.Set("P2pDroMaxRetransmissions", UintegerValue(3));' in code
 
 
 def test_rpl_table_snapshots_scheduled_by_default():

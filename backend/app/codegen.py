@@ -19,6 +19,7 @@ from .models import (
     Network,
     NetworkType,
     OnOffApp,
+    P2pDiscoverApp,
     PingApp,
     Scenario,
     UdpEchoApp,
@@ -141,10 +142,10 @@ def _app_ctx(scenario: Scenario, i: int, app, ipv6: bool) -> dict[str, Any]:
         "kind": app.type,
         "start": app.start,
     }
-    if isinstance(app, AodvDiscoverApp):
-        # One-shot DiscoverRoute() call, not an installed application: no
-        # stop time, and the target is resolved at runtime (Ns3EditGlobalAddressOf),
-        # never as a compile-time address expression.
+    if isinstance(app, (AodvDiscoverApp, P2pDiscoverApp)):
+        # One-shot DiscoverRoute()/DiscoverP2pRoute() call, not an installed
+        # application: no stop time, and the target is resolved at runtime
+        # (Ns3EditGlobalAddressOf), never as a compile-time address expression.
         common.update(
             from_index=scenario.node_index(app.fromNode),
             to_index=scenario.node_index(app.to),
@@ -195,6 +196,7 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
     networks = [_network_ctx(scenario, i, net, rpl_mrhof) for i, net in enumerate(scenario.networks)]
     apps = [_app_ctx(scenario, i, app, ipv6) for i, app in enumerate(scenario.apps)]
     has_aodv_discover = any(isinstance(a, AodvDiscoverApp) for a in scenario.apps)
+    has_p2p_discover = any(isinstance(a, P2pDiscoverApp) for a in scenario.apps)
 
     return {
         "scenario_name": scenario.name,
@@ -234,6 +236,14 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
                 "aodv_rank_limit": scenario.stack.rpl[0].aodvRankLimit,
                 "aodv_lifetime": scenario.stack.rpl[0].aodvLifetime,
                 "aodv_rejoin_reenable": scenario.stack.rpl[0].aodvRejoinReenable,
+                "p2p_dio_interval_min": scenario.stack.rpl[0].p2pDioIntervalMin,
+                "p2p_dio_interval_doublings": scenario.stack.rpl[0].p2pDioIntervalDoublings,
+                "p2p_dio_redundancy": scenario.stack.rpl[0].p2pDioRedundancy,
+                "p2p_max_rank": scenario.stack.rpl[0].p2pMaxRank,
+                "p2p_lifetime": scenario.stack.rpl[0].p2pLifetime,
+                "p2p_dro_ack_requested": scenario.stack.rpl[0].p2pDroAckRequested,
+                "p2p_dro_ack_wait_time": scenario.stack.rpl[0].p2pDroAckWaitTime,
+                "p2p_dro_max_retransmissions": scenario.stack.rpl[0].p2pDroMaxRetransmissions,
             }
             if rpl
             else None
@@ -247,6 +257,7 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
         "has_udp_echo": any(isinstance(a, UdpEchoApp) for a in scenario.apps),
         "has_onoff": any(isinstance(a, OnOffApp) for a in scenario.apps),
         "has_aodv_discover": has_aodv_discover,
+        "has_p2p_discover": has_p2p_discover,
     }
 
 

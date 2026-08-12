@@ -102,6 +102,18 @@ class RplConfig(BaseModel):
     aodvRankLimit: int = Field(default=8, ge=0, le=127)
     aodvLifetime: int = Field(default=1, ge=0, le=3)
     aodvRejoinReenable: float = 900.0
+    # P2P-RPL (RFC 6997) route-discovery tuning, mirrored from the defaults
+    # on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
+    # into rplHelper.Set(...) calls when the scenario actually has a
+    # p2pDiscover app (see codegen.build_context's has_p2p_discover).
+    p2pDioIntervalMin: float = 0.064
+    p2pDioIntervalDoublings: int = Field(default=4, ge=0, le=255)
+    p2pDioRedundancy: int = Field(default=1, ge=0, le=255)
+    p2pMaxRank: int = Field(default=8, ge=0, le=63)
+    p2pLifetime: int = Field(default=2, ge=0, le=3)
+    p2pDroAckRequested: bool = True
+    p2pDroAckWaitTime: float = 1.0
+    p2pDroMaxRetransmissions: int = Field(default=3, ge=0, le=255)
 
 
 class StackConfig(BaseModel):
@@ -172,8 +184,27 @@ class AodvDiscoverApp(BaseModel):
     start: float = 1.0
 
 
+class P2pDiscoverApp(BaseModel):
+    """Triggers rpl::RplRoutingProtocol::DiscoverP2pRoute() (RFC 6997) at runtime.
+
+    A one-shot call, not a running application, so unlike the other App
+    kinds it has no stop time. Source Route (H=0) only -- DiscoverP2pRoute()'s
+    own hopByHop parameter is not exposed here, mirroring AodvDiscoverApp's
+    own H=0-only scope.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: Literal["p2pDiscover"] = "p2pDiscover"
+    id: str
+    fromNode: str = Field(alias="from")
+    to: str
+    start: float = 1.0
+
+
 App = Annotated[
-    Union[PingApp, UdpEchoApp, OnOffApp, AodvDiscoverApp], Field(discriminator="type")
+    Union[PingApp, UdpEchoApp, OnOffApp, AodvDiscoverApp, P2pDiscoverApp],
+    Field(discriminator="type"),
 ]
 
 

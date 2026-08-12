@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from .models import AodvDiscoverApp, Network, NetworkType, PingApp, OnOffApp, Scenario, UdpEchoApp
+from .models import (
+    AodvDiscoverApp,
+    Network,
+    NetworkType,
+    OnOffApp,
+    P2pDiscoverApp,
+    PingApp,
+    Scenario,
+    UdpEchoApp,
+)
 
 
 class Issue(BaseModel):
@@ -26,7 +35,7 @@ def _warn(issues: list[Issue], element_id: str | None, message: str) -> None:
 
 
 def _app_endpoints(app) -> list[str]:
-    if isinstance(app, (PingApp, OnOffApp, AodvDiscoverApp)):
+    if isinstance(app, (PingApp, OnOffApp, AodvDiscoverApp, P2pDiscoverApp)):
         return [app.fromNode, app.to]
     if isinstance(app, UdpEchoApp):
         return [app.client, app.server]
@@ -134,11 +143,13 @@ def _validate_apps(scenario: Scenario, node_ids: set[str], issues: list[Issue]) 
             _warn(issues, app.id, "送信元と宛先が同じノードです")
         if app.start >= duration:
             _warn(issues, app.id, f"開始時刻 {app.start}s がシミュレーション時間 {duration}s 以降です")
-        stop = getattr(app, "stop", None)  # AodvDiscoverApp is one-shot, has no stop
+        stop = getattr(app, "stop", None)  # AodvDiscoverApp/P2pDiscoverApp are one-shot, no stop
         if stop is not None and stop <= app.start:
             _err(issues, app.id, "停止時刻が開始時刻以前です")
         if isinstance(app, AodvDiscoverApp) and scenario.stack.routing != "rpl":
             _err(issues, app.id, "AODV-RPL 経路探索には RPL ルーティングが必要です")
+        if isinstance(app, P2pDiscoverApp) and scenario.stack.routing != "rpl":
+            _err(issues, app.id, "P2P-RPL 経路探索には RPL ルーティングが必要です")
 
 
 def has_errors(issues: list[Issue]) -> bool:

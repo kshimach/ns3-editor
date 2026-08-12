@@ -86,7 +86,7 @@ DumpRplTables(NodeContainer nodes, Time interval)
 }
 {% endif %}
 
-{% if has_ping or has_udp_echo or has_onoff or has_aodv_discover %}
+{% if has_ping or has_udp_echo or has_onoff or has_aodv_discover or has_p2p_discover %}
 // With RPL every node forms its global address through SLAAC at run time, so
 // a ping/echo/onoff/discovery target has no address to name at configuration
 // time; resolve it once the DODAG has settled instead.
@@ -214,6 +214,28 @@ static void
     }
 
     origin->DiscoverRoute(target);
+}
+
+{% endfor %}
+{% for app in apps if app.kind == 'p2pDiscover' %}
+static void
+{{ app.cvar }}Start(NodeContainer nodes)
+{
+    // P2P-RPL (RFC 6997) route discovery: the same reasoning as the
+    // AODV-RPL discovery helper above -- DiscoverP2pRoute() floods its own
+    // temporary DAG independently of the DAO-built tree, so only the
+    // origin's own global address (which it needs to root the temporary
+    // DAG) and the target's SLAAC address have to be ready.
+    Ptr<rpl::RplRoutingProtocol> origin =
+        nodes.Get({{ app.from_index }})->GetObject<rpl::RplRoutingProtocol>();
+    Ipv6Address target = Ns3EditGlobalAddressOf(nodes.Get({{ app.to_index }}));
+    if (origin->GetGlobalAddress().IsAny() || target.IsAny())
+    {
+        Simulator::Schedule(Seconds(1.0), &{{ app.cvar }}Start, nodes);
+        return;
+    }
+
+    origin->DiscoverP2pRoute(target);
 }
 
 {% endfor %}
@@ -348,6 +370,19 @@ main(int argc, char** argv)
     rplHelper.Set("AodvLifetime", UintegerValue({{ rpl.aodv_lifetime }}));
     rplHelper.Set("AodvRejoinReenable", TimeValue(Seconds({{ rpl.aodv_rejoin_reenable }})));
 {% endif %}
+{% if has_p2p_discover %}
+    // P2P-RPL (RFC 6997) route-discovery tuning; see RplConfig's p2p*
+    // fields (paced much faster than the base DODAG's own Trickle timer,
+    // since a discovery has to finish inside its own 'L' lifetime).
+    rplHelper.Set("P2pDioIntervalMin", TimeValue(Seconds({{ rpl.p2p_dio_interval_min }})));
+    rplHelper.Set("P2pDioIntervalDoublings", UintegerValue({{ rpl.p2p_dio_interval_doublings }}));
+    rplHelper.Set("P2pDioRedundancy", UintegerValue({{ rpl.p2p_dio_redundancy }}));
+    rplHelper.Set("P2pMaxRank", UintegerValue({{ rpl.p2p_max_rank }}));
+    rplHelper.Set("P2pLifetime", UintegerValue({{ rpl.p2p_lifetime }}));
+    rplHelper.Set("P2pDroAckRequested", BooleanValue({{ 'true' if rpl.p2p_dro_ack_requested else 'false' }}));
+    rplHelper.Set("P2pDroAckWaitTime", TimeValue(Seconds({{ rpl.p2p_dro_ack_wait_time }})));
+    rplHelper.Set("P2pDroMaxRetransmissions", UintegerValue({{ rpl.p2p_dro_max_retransmissions }}));
+{% endif %}
     InternetStackHelper internet;
     internet.SetRoutingHelper(rplHelper);
     internet.Install(nodes);
@@ -464,6 +499,9 @@ main(int argc, char** argv)
 {% endif %}
 {% elif app.kind == 'aodvDiscover' %}
     // App "{{ app.id }}" (AODV-RPL discovery, RFC 9854)
+    Simulator::Schedule(Seconds({{ app.start }}), &{{ app.cvar }}Start, nodes);
+{% elif app.kind == 'p2pDiscover' %}
+    // App "{{ app.id }}" (P2P-RPL discovery, RFC 6997)
     Simulator::Schedule(Seconds({{ app.start }}), &{{ app.cvar }}Start, nodes);
 {% endif %}
 

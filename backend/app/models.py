@@ -83,6 +83,11 @@ class RplConfig(BaseModel):
     root: str = ""
     ocp: Literal["of0", "mrhof"] = "of0"
     enableLql: bool = False
+    # RFC 6550 Mode of Operation: Non-storing (root computes and Source
+    # Routes downward traffic) or Storing (every router keeps its own
+    # downward routing table, RFC 6550 section 9.8). Mirrors contrib/rpl's
+    # own "Mop" attribute default (RPL_MOP_NON_STORING).
+    mop: Literal["non-storing", "storing"] = "non-storing"
     # Core RPL (RFC 6550) tuning, mirrored from the defaults on
     # rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered into
     # rplHelper.Set(...) calls when a value differs from that default (see
@@ -106,6 +111,10 @@ class RplConfig(BaseModel):
     aodvRankLimit: int = Field(default=8, ge=0, le=127)
     aodvLifetime: int = Field(default=1, ge=0, le=3)
     aodvRejoinReenable: float = 900.0
+    # RFC 9854 section 7's 'S' flag, inverted: False (default) is symmetric
+    # (S=1, TargNode unicasts an RREP back along the reverse RREQ path);
+    # True is asymmetric (S=0, TargNode floods an RREP-Instance instead).
+    aodvForceAsymmetric: bool = False
     # P2P-RPL (RFC 6997) route-discovery tuning, mirrored from the defaults
     # on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
     # into rplHelper.Set(...) calls when the scenario actually has a
@@ -118,6 +127,11 @@ class RplConfig(BaseModel):
     p2pDroAckRequested: bool = True
     p2pDroAckWaitTime: float = 1.0
     p2pDroMaxRetransmissions: int = Field(default=3, ge=0, le=255)
+    # RFC 6997 section 9.5's 'N' (Number of Routes): 0 (default) asks the
+    # Target for a single P2P-DRO; 1-3 asks it to also report that many
+    # alternate routes, collected over p2pDroCollectWindow before replying.
+    p2pNumRoutes: int = Field(default=0, ge=0, le=3)
+    p2pDroCollectWindow: float = 0.256
 
 
 class StackConfig(BaseModel):
@@ -186,15 +200,17 @@ class AodvDiscoverApp(BaseModel):
     fromNode: str = Field(alias="from")
     to: str
     start: float = 1.0
+    # DiscoverRoute()'s own hopByHop parameter: False (default) is Source
+    # Route (H=0, an Address Vector carried in the RREP); True is Hop-by-hop
+    # (H=1, every router along the path keeps its own next-hop entry).
+    hopByHop: bool = False
 
 
 class P2pDiscoverApp(BaseModel):
     """Triggers rpl::RplRoutingProtocol::DiscoverP2pRoute() (RFC 6997) at runtime.
 
     A one-shot call, not a running application, so unlike the other App
-    kinds it has no stop time. Source Route (H=0) only -- DiscoverP2pRoute()'s
-    own hopByHop parameter is not exposed here, mirroring AodvDiscoverApp's
-    own H=0-only scope.
+    kinds it has no stop time.
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -204,6 +220,9 @@ class P2pDiscoverApp(BaseModel):
     fromNode: str = Field(alias="from")
     to: str
     start: float = 1.0
+    # Same H=0/H=1 choice as AodvDiscoverApp.hopByHop, for
+    # DiscoverP2pRoute()'s own hopByHop parameter.
+    hopByHop: bool = False
 
 
 App = Annotated[

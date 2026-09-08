@@ -153,6 +153,7 @@ def _app_ctx(scenario: Scenario, i: int, app, ipv6: bool) -> dict[str, Any]:
         common.update(
             from_index=scenario.node_index(app.fromNode),
             to_index=scenario.node_index(app.to),
+            hop_by_hop=app.hopByHop,
         )
         return common
     common["stop"] = app.stop if app.stop is not None else duration
@@ -223,6 +224,7 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
                 "root_prefix": _rpl_root_prefix(scenario),
                 "mrhof": rpl_mrhof,
                 "enable_lql": scenario.stack.rpl[0].enableLql,
+                "storing": scenario.stack.rpl[0].mop == "storing",
                 # Clamped at zero so a negative interval reads as "off"
                 # rather than scheduling an event in the past forever.
                 "table_interval": max(0.0, scenario.simulation.rplTableInterval),
@@ -240,6 +242,7 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
                 "aodv_rank_limit": scenario.stack.rpl[0].aodvRankLimit,
                 "aodv_lifetime": scenario.stack.rpl[0].aodvLifetime,
                 "aodv_rejoin_reenable": scenario.stack.rpl[0].aodvRejoinReenable,
+                "aodv_force_asymmetric": scenario.stack.rpl[0].aodvForceAsymmetric,
                 "p2p_dio_interval_min": scenario.stack.rpl[0].p2pDioIntervalMin,
                 "p2p_dio_interval_doublings": scenario.stack.rpl[0].p2pDioIntervalDoublings,
                 "p2p_dio_redundancy": scenario.stack.rpl[0].p2pDioRedundancy,
@@ -248,6 +251,8 @@ def build_context(scenario: Scenario) -> dict[str, Any]:
                 "p2p_dro_ack_requested": scenario.stack.rpl[0].p2pDroAckRequested,
                 "p2p_dro_ack_wait_time": scenario.stack.rpl[0].p2pDroAckWaitTime,
                 "p2p_dro_max_retransmissions": scenario.stack.rpl[0].p2pDroMaxRetransmissions,
+                "p2p_num_routes": scenario.stack.rpl[0].p2pNumRoutes,
+                "p2p_dro_collect_window": scenario.stack.rpl[0].p2pDroCollectWindow,
             }
             if rpl
             else None

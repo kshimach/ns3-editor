@@ -32,7 +32,7 @@ def test_rpl_aodv_mesh_sample_generates():
     # from "b" to "c" completes over a direct 1-hop peer link neither node's
     # base DODAG tree route would ever use on its own.
     code = generate(_load("rpl-aodv-mesh"))
-    assert "origin->DiscoverRoute(target);" in code
+    assert "origin->DiscoverRoute(target, false);" in code
     assert 'rplHelper.Set("AodvRankLimit", UintegerValue(8));' in code
 
 
@@ -42,7 +42,7 @@ def test_rpl_p2p_mesh_sample_generates():
     # base DODAG tree route would ever use on its own -- same topology as
     # rpl-aodv-mesh, same physical link, a different protocol finding it.
     code = generate(_load("rpl-p2p-mesh"))
-    assert "origin->DiscoverP2pRoute(target);" in code
+    assert "origin->DiscoverP2pRoute(target, false);" in code
     assert 'rplHelper.Set("P2pMaxRank", UintegerValue(8));' in code
 
 
@@ -88,6 +88,34 @@ def test_rpl_line_structure():
     # tries to send before it has one, which a slow-to-converge DODAG can
     # still trigger well after the topology-size check passes.
     assert "senderReady" in code
+
+
+def test_rpl_loop_event_wiring_always_present():
+    # Unlike DumpRplTables (gated on rplTableInterval > 0), the loop-event
+    # trace connect is unconditional whenever RPL routing is used: it is
+    # cheap and does not depend on the periodic-sampling feature at all.
+    code = generate(_load("rpl-line"))
+    assert "OnRankErrorConfirmed(uint32_t nodeIndex, uint8_t instanceId)" in code
+    assert '"##LOOPEVENT## "' not in code  # marker is built inline, not as a literal
+    assert '"##LOOPEVENT## {\\"node\\": "' in code
+    assert 'TraceConnectWithoutContext("RankErrorConfirmed",' in code
+    assert "MakeBoundCallback(&OnRankErrorConfirmed, i)" in code
+
+    no_rpl_code = generate(_load("wifi-adhoc-ping"))
+    assert "OnRankErrorConfirmed" not in no_rpl_code
+    assert "LOOPEVENT" not in no_rpl_code
+
+
+def test_rpl_storing_mode_sets_mop():
+    # Default (non-storing) omits Mop entirely -- it's contrib/rpl's own
+    # attribute default, so an untouched scenario's generated code should
+    # not carry a redundant Set() for it.
+    assert 'rplHelper.Set("Mop"' not in generate(_load("rpl-line"))
+
+    scenario = _load("rpl-line")
+    scenario.stack.rpl[0].mop = "storing"
+    code = generate(scenario)
+    assert 'rplHelper.Set("Mop", UintegerValue(rpl::RPL_MOP_STORING_NO_MULTICAST));' in code
 
 
 def test_rpl_udp_echo_and_onoff_resolve_target_at_runtime():
@@ -142,7 +170,7 @@ def test_rpl_aodv_discover_structure():
     assert "nodes.Get(2)->GetObject<rpl::RplRoutingProtocol>();" in code
     assert "Ns3EditGlobalAddressOf(nodes.Get(0))" in code
     assert "origin->GetGlobalAddress().IsAny()" in code
-    assert "origin->DiscoverRoute(target);" in code
+    assert "origin->DiscoverRoute(target, false);" in code
     assert "Simulator::Schedule(Seconds(100.0), &app1Start, nodes);" in code
 
     # Unlike ping/udpEcho/onoff, discovery does not wait for the base
@@ -177,6 +205,17 @@ def test_rpl_aodv_attributes_only_rendered_when_discovery_present():
     assert 'rplHelper.Set("AodvRejoinReenable", TimeValue(Seconds(900.0)));' in code
 
 
+def test_rpl_aodv_force_asymmetric():
+    # Default (symmetric, S=1) omits the attribute entirely.
+    scenario = _load("rpl-line")
+    scenario.apps.append(AodvDiscoverApp(id="app-discover", **{"from": "n2"}, to="n0"))
+    assert 'rplHelper.Set("AodvForceAsymmetric"' not in generate(scenario)
+
+    scenario.stack.rpl[0].aodvForceAsymmetric = True
+    code = generate(scenario)
+    assert 'rplHelper.Set("AodvForceAsymmetric", BooleanValue(true));' in code
+
+
 def test_rpl_p2p_discover_structure():
     scenario = _load("rpl-line")
     scenario.apps.append(P2pDiscoverApp(id="app-discover", **{"from": "n2"}, to="n0", start=100))
@@ -186,7 +225,7 @@ def test_rpl_p2p_discover_structure():
     assert "nodes.Get(2)->GetObject<rpl::RplRoutingProtocol>();" in code
     assert "Ns3EditGlobalAddressOf(nodes.Get(0))" in code
     assert "origin->GetGlobalAddress().IsAny()" in code
-    assert "origin->DiscoverP2pRoute(target);" in code
+    assert "origin->DiscoverP2pRoute(target, false);" in code
     assert "Simulator::Schedule(Seconds(100.0), &app1Start, nodes);" in code
 
     # Unlike ping/udpEcho/onoff, discovery does not wait for the base
@@ -195,6 +234,37 @@ def test_rpl_p2p_discover_structure():
     start = code.index("app1Start(NodeContainer nodes)")
     end = code.index("int\nmain(int argc")
     assert "GetTopologySize" not in code[start:end]
+
+
+def test_rpl_discover_hop_by_hop_flag():
+    # H=1 must actually reach the generated Discover*Route() call, not just
+    # exist as an ignored model field.
+    scenario = _load("rpl-line")
+    scenario.apps.append(
+        AodvDiscoverApp(id="app-aodv", **{"from": "n2"}, to="n0", hopByHop=True)
+    )
+    scenario.apps.append(
+        P2pDiscoverApp(id="app-p2p", **{"from": "n2"}, to="n0", hopByHop=True)
+    )
+    code = generate(scenario)
+    assert "origin->DiscoverRoute(target, true);" in code
+    assert "origin->DiscoverP2pRoute(target, true);" in code
+
+
+def test_rpl_p2p_num_routes():
+    # N is always rendered (its own default, 0, is meaningful on the wire --
+    # unlike the Trickle/lifetime knobs above it, 0 is not "unset").
+    scenario = _load("rpl-line")
+    scenario.apps.append(P2pDiscoverApp(id="app-discover", **{"from": "n2"}, to="n0"))
+    code = generate(scenario)
+    assert 'rplHelper.Set("P2pNumRoutes", UintegerValue(0));' in code
+    assert 'rplHelper.Set("P2pDroCollectWindow"' not in code
+
+    scenario.stack.rpl[0].p2pNumRoutes = 2
+    scenario.stack.rpl[0].p2pDroCollectWindow = 0.5
+    code = generate(scenario)
+    assert 'rplHelper.Set("P2pNumRoutes", UintegerValue(2));' in code
+    assert 'rplHelper.Set("P2pDroCollectWindow", TimeValue(Seconds(0.5)));' in code
 
 
 def test_rpl_p2p_discover_requires_rpl_routing():

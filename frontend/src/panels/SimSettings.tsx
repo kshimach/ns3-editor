@@ -146,6 +146,7 @@ export function SimSettings() {
                   root: "",
                   ocp: "of0",
                   enableLql: false,
+                  mop: "non-storing",
                   disInterval: 30,
                   dioIntervalMin: 4.096,
                   dioIntervalDoublings: 8,
@@ -160,6 +161,7 @@ export function SimSettings() {
                   aodvRankLimit: 8,
                   aodvLifetime: 1,
                   aodvRejoinReenable: 900,
+                  aodvForceAsymmetric: false,
                   p2pDioIntervalMin: 0.064,
                   p2pDioIntervalDoublings: 4,
                   p2pDioRedundancy: 1,
@@ -168,6 +170,8 @@ export function SimSettings() {
                   p2pDroAckRequested: true,
                   p2pDroAckWaitTime: 1,
                   p2pDroMaxRetransmissions: 3,
+                  p2pNumRoutes: 0,
+                  p2pDroCollectWindow: 0.256,
                 })
               }
             >
@@ -240,6 +244,7 @@ export function SimSettings() {
                   from: scenario.nodes[0]?.id ?? "",
                   to: scenario.nodes[1]?.id ?? scenario.nodes[0]?.id ?? "",
                   start: 1,
+                  hopByHop: false,
                 })
               }
             >
@@ -255,6 +260,7 @@ export function SimSettings() {
                   from: scenario.nodes[0]?.id ?? "",
                   to: scenario.nodes[1]?.id ?? scenario.nodes[0]?.id ?? "",
                   start: 1,
+                  hopByHop: false,
                 })
               }
             >
@@ -332,6 +338,18 @@ function AppRow({
           />
         </label>
       )}
+      {(app.type === "aodvDiscover" || app.type === "p2pDiscover") && (
+        <label>
+          <input
+            type="checkbox"
+            checked={app.hopByHop}
+            onChange={(e) =>
+              onChange(app.id, { hopByHop: e.target.checked } as Partial<App>)
+            }
+          />
+          H=1 (hop-by-hop)
+        </label>
+      )}
       <button className="tiny danger" onClick={() => onRemove(app.id)}>
         削除
       </button>
@@ -389,6 +407,18 @@ function RplInstanceRow({
           onChange={(e) => onChange(instance.id, { enableLql: e.target.checked })}
         />
         LQL (RSSI 由来) を advertise
+      </label>
+      <label>
+        Mode of Operation
+        <select
+          value={instance.mop}
+          onChange={(e) =>
+            onChange(instance.id, { mop: e.target.value as "non-storing" | "storing" })
+          }
+        >
+          <option value="non-storing">Non-storing (下りは Source Route)</option>
+          <option value="storing">Storing (各ルータが下り経路を保持)</option>
+        </select>
       </label>
       {index === 0 && (
         <details className="rpl-aodv-settings">
@@ -539,6 +569,16 @@ function RplInstanceRow({
               onCommit={(aodvRejoinReenable) => onChange(instance.id, { aodvRejoinReenable })}
             />
           </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={instance.aodvForceAsymmetric}
+              onChange={(e) =>
+                onChange(instance.id, { aodvForceAsymmetric: e.target.checked })
+              }
+            />
+            非対称モード (S=0, RREP-Instance をフラッディング)
+          </label>
         </details>
       )}
       {index === 0 && (
@@ -629,6 +669,32 @@ function RplInstanceRow({
               }
             />
           </label>
+          <label>
+            N (要求する経路数、0 = 単一経路)
+            <select
+              value={instance.p2pNumRoutes}
+              onChange={(e) => onChange(instance.id, { p2pNumRoutes: Number(e.target.value) })}
+            >
+              <option value={0}>0 (単一経路)</option>
+              <option value={1}>1 (別経路を1件収集)</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+            </select>
+          </label>
+          {instance.p2pNumRoutes > 0 && (
+            <label>
+              代替経路の収集時間 (s)
+              <NumberField
+                value={instance.p2pDroCollectWindow}
+                fallback={0.256}
+                min={0.001}
+                step="0.001"
+                onCommit={(p2pDroCollectWindow) =>
+                  onChange(instance.id, { p2pDroCollectWindow })
+                }
+              />
+            </label>
+          )}
         </details>
       )}
       {onRemove && (

@@ -598,6 +598,36 @@ ul {
   font-weight: 600;
 }
 
+.rpl-loop-events {
+  border: 1px solid #d1453b;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  background: #fdeceb;
+}
+
+.rpl-loop-events summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #a52a20;
+}
+
+.rpl-loop-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #d1453b;
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+}
+
+.rpl-loop-events ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
 .rpl-node h4,
 .rpl-topology h5,
 .rpl-node h5 {

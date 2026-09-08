@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, openRunSocket } from "../api";
 import { useEditor } from "../store";
-import { Issue, RplSnapshot, RunStatus } from "../types";
+import { Issue, LoopEvent, RplSnapshot, RunStatus } from "../types";
 
 const STATE_LABELS: Record<RunStatus["state"], string> = {
   idle: "待機",
@@ -21,6 +21,8 @@ export function RunView() {
   const setIssues = useEditor((s) => s.setIssues);
   const addRplSnapshot = useEditor((s) => s.addRplSnapshot);
   const clearRplSnapshots = useEditor((s) => s.clearRplSnapshots);
+  const addLoopEvent = useEditor((s) => s.addLoopEvent);
+  const clearLoopEvents = useEditor((s) => s.clearLoopEvents);
   const [status, setStatus] = useState<RunStatus | null>(null);
   const [lines, setLines] = useState<string[]>([]);
   const [artifacts, setArtifacts] = useState<{ name: string; size: number }[]>([]);
@@ -34,11 +36,14 @@ export function RunView() {
         type: string;
         text?: string;
         snapshot?: RplSnapshot;
+        event?: LoopEvent;
       } & Partial<RunStatus>;
       if (msg.type === "line" && msg.text !== undefined) {
         setLines((prev) => [...prev, msg.text as string]);
       } else if (msg.type === "rplTable" && msg.snapshot !== undefined) {
         addRplSnapshot(msg.snapshot);
+      } else if (msg.type === "loopEvent" && msg.event !== undefined) {
+        addLoopEvent(msg.event);
       } else if (msg.type === "status") {
         setStatus(msg as unknown as RunStatus);
         if (msg.state !== "running") {
@@ -61,6 +66,7 @@ export function RunView() {
     setError(null);
     setLines([]);
     clearRplSnapshots();
+    clearLoopEvents();
     const res = await api.run(scenario);
     if (res.status === 422) {
       const body = (await res.json()) as { issues: Issue[] };

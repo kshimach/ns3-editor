@@ -7,6 +7,7 @@ import { create } from "zustand";
 import {
   App,
   Issue,
+  LoopEvent,
   Network,
   NetworkType,
   RplConfig,
@@ -34,6 +35,8 @@ interface EditorState {
    * the tab that renders these is a sibling of it.
    */
   rplSnapshots: RplSnapshot[];
+  /** Confirmed routing-loop events from the current run, in arrival order. */
+  loopEvents: LoopEvent[];
   /**
    * Whether the canvas draws the approximate radio range ring around each
    * LR-WPAN/WiFi member node. Purely a view preference -- it affects nothing
@@ -48,6 +51,8 @@ interface EditorState {
   updateScenario: (patch: Partial<Scenario>) => void;
   addRplSnapshot: (snapshot: RplSnapshot) => void;
   clearRplSnapshots: () => void;
+  addLoopEvent: (event: LoopEvent) => void;
+  clearLoopEvents: () => void;
   toggleRadioRange: () => void;
 
   addNode: (x: number, y: number) => void;
@@ -78,6 +83,7 @@ export const useEditor = create<EditorState>((set, get) => ({
   issues: [],
   counter: 0,
   rplSnapshots: [],
+  loopEvents: [],
   showRadioRange: true,
 
   select: (selection) => set({ selection }),
@@ -95,13 +101,15 @@ export const useEditor = create<EditorState>((set, get) => ({
     nextId = used.length ? Math.max(...used) + 1 : 0;
     // The snapshots are indexed by node number, which now means a different
     // node than it did: keeping them would label the old run's tables with
-    // the new scenario's names.
-    set({ scenario, selection: null, issues: [], rplSnapshots: [] });
+    // the new scenario's names. Same reasoning for loopEvents.
+    set({ scenario, selection: null, issues: [], rplSnapshots: [], loopEvents: [] });
   },
   setIssues: (issues) => set({ issues }),
   updateScenario: (patch) => set({ scenario: { ...get().scenario, ...patch } }),
   addRplSnapshot: (snapshot) => set({ rplSnapshots: [...get().rplSnapshots, snapshot] }),
   clearRplSnapshots: () => set({ rplSnapshots: [] }),
+  addLoopEvent: (event) => set({ loopEvents: [...get().loopEvents, event] }),
+  clearLoopEvents: () => set({ loopEvents: [] }),
   toggleRadioRange: () => set({ showRadioRange: !get().showRadioRange }),
 
   addNode: (x, y) => {

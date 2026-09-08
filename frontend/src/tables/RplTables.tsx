@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 
 import { useEditor } from "../store";
-import { RplSnapshot } from "../types";
+import { LoopEvent, RplSnapshot } from "../types";
 
 /** ETX is carried as a plain number; two decimals is the useful resolution. */
 function etx(value: number | null): string {
@@ -18,8 +18,29 @@ function seconds(value: number | null): string {
   return value === null ? "無期限" : `${value.toFixed(1)}s`;
 }
 
+function LoopEvents({ events, nodeLabel }: { events: LoopEvent[]; nodeLabel: (i: number) => string }) {
+  if (events.length === 0) {
+    return null;
+  }
+  return (
+    <details className="rpl-loop-events" open>
+      <summary>
+        確認済みループ <span className="rpl-loop-count">{events.length}</span>
+      </summary>
+      <ul>
+        {events.map((e, i) => (
+          <li key={i} className="mono">
+            {e.time.toFixed(1)}s -- {nodeLabel(e.node)} (instance {e.instanceId})
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function RplTables() {
   const snapshots = useEditor((s) => s.rplSnapshots);
+  const loopEvents = useEditor((s) => s.loopEvents);
   const scenario = useEditor((s) => s.scenario);
   const [timeIndex, setTimeIndex] = useState<number | null>(null);
   const [nodeId, setNodeId] = useState<number | null>(null);
@@ -63,12 +84,14 @@ export function RplTables() {
             ? " 「実行」タブでシミュレーションを開始してください。"
             : " このシナリオは RPL でルーティングしていません。"}
         </p>
+        <LoopEvents events={loopEvents} nodeLabel={nodeLabel} />
       </div>
     );
   }
 
   return (
     <div className="rpl-tables">
+      <LoopEvents events={loopEvents} nodeLabel={nodeLabel} />
       <div className="rpl-controls">
         <label>
           時刻

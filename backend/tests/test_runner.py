@@ -60,3 +60,28 @@ def test_snapshots_are_replayed_to_a_late_subscriber():
     assert "rplTable" in kinds
     assert kinds[-1] == "status"
     assert [b["snapshot"] for b in backlog if b["type"] == "rplTable"] == [{"node": 0}]
+
+
+def test_marked_loop_event_is_lifted_out_of_the_log():
+    m = _manager()
+    assert m._take_loop_event('##LOOPEVENT## {"node":2,"time":41.5,"instanceId":0}') is True
+    assert m.loop_events == [{"node": 2, "time": 41.5, "instanceId": 0}]
+    assert m.lines == []
+
+
+def test_unparsable_loop_event_goes_back_to_the_log():
+    m = _manager()
+    assert m._take_loop_event("##LOOPEVENT## {not json") is False
+    assert m.loop_events == []
+
+
+def test_loop_events_are_replayed_to_a_late_subscriber():
+    m = _manager()
+    m._take_loop_event('##LOOPEVENT## {"node":2,"time":41.5,"instanceId":0}')
+    backlog, _ = m.subscribe()
+    kinds = [b["type"] for b in backlog]
+    assert "loopEvent" in kinds
+    assert kinds[-1] == "status"
+    assert [b["event"] for b in backlog if b["type"] == "loopEvent"] == [
+        {"node": 2, "time": 41.5, "instanceId": 0}
+    ]

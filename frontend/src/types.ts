@@ -30,6 +30,8 @@ export interface RplConfig {
   root: string;
   ocp: "of0" | "mrhof";
   enableLql: boolean;
+  /** RFC 6550 Mode of Operation: Non-storing (SRH downward) or Storing. */
+  mop: "non-storing" | "storing";
   /**
    * Core RPL (RFC 6550) tuning, mirrored from the defaults on
    * rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered into
@@ -54,6 +56,8 @@ export interface RplConfig {
   aodvRankLimit: number;
   aodvLifetime: number;
   aodvRejoinReenable: number;
+  /** RFC 9854 'S' flag inverted: false=symmetric (S=1), true=asymmetric (S=0). */
+  aodvForceAsymmetric: boolean;
   /**
    * P2P-RPL (RFC 6997) route-discovery tuning, mirrored from the defaults
    * on rpl::RplRoutingProtocol's own TypeId (contrib/rpl). Only rendered
@@ -66,6 +70,9 @@ export interface RplConfig {
   p2pLifetime: number;
   p2pDroAckRequested: boolean;
   p2pDroAckWaitTime: number;
+  /** RFC 6997 section 9.5's 'N': 0 = single route, 1-3 = also collect that many alternates. */
+  p2pNumRoutes: number;
+  p2pDroCollectWindow: number;
   p2pDroMaxRetransmissions: number;
 }
 
@@ -123,6 +130,8 @@ export interface AodvDiscoverApp {
   from: string;
   to: string;
   start: number;
+  /** DiscoverRoute()'s hopByHop: false=H=0 Source Route, true=H=1. */
+  hopByHop: boolean;
 }
 
 export interface P2pDiscoverApp {
@@ -131,6 +140,8 @@ export interface P2pDiscoverApp {
   from: string;
   to: string;
   start: number;
+  /** DiscoverP2pRoute()'s hopByHop: false=H=0 Source Route, true=H=1. */
+  hopByHop: boolean;
 }
 
 export type App = PingApp | UdpEchoApp | OnOffApp | AodvDiscoverApp | P2pDiscoverApp;
@@ -213,6 +224,13 @@ export interface RplP2pRouteEntry {
   expiresIn: number;
 }
 
+/** A confirmed routing loop (RplRoutingProtocol's "RankErrorConfirmed" trace). */
+export interface LoopEvent {
+  node: number;
+  time: number;
+  instanceId: number;
+}
+
 export interface RplSnapshot {
   node: number;
   time: number;
@@ -276,6 +294,7 @@ export function defaultScenario(): Scenario {
           root: "",
           ocp: "of0",
           enableLql: false,
+          mop: "non-storing",
           disInterval: 30,
           dioIntervalMin: 4.096,
           dioIntervalDoublings: 8,
@@ -290,6 +309,7 @@ export function defaultScenario(): Scenario {
           aodvRankLimit: 8,
           aodvLifetime: 1,
           aodvRejoinReenable: 900,
+          aodvForceAsymmetric: false,
           p2pDioIntervalMin: 0.064,
           p2pDioIntervalDoublings: 4,
           p2pDioRedundancy: 1,
@@ -298,6 +318,8 @@ export function defaultScenario(): Scenario {
           p2pDroAckRequested: true,
           p2pDroAckWaitTime: 1,
           p2pDroMaxRetransmissions: 3,
+          p2pNumRoutes: 0,
+          p2pDroCollectWindow: 0.256,
         },
       ],
     },

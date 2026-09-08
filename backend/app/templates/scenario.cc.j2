@@ -42,6 +42,19 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE("{{ component }}");
 
 {% if rpl %}
+// A routing loop was actually walked by a packet (RplRoutingProtocol's
+// "RankErrorConfirmed" trace source -- see contrib/rpl's
+// NotifyRankInconsistency()). One line per event, behind its own marker so
+// the editor's run manager can lift it out of the simulation's stdout and
+// deliver it as its own live feed, not mixed into the run log.
+static void
+OnRankErrorConfirmed(uint32_t nodeIndex, uint8_t instanceId)
+{
+    std::cout << "##LOOPEVENT## {\"node\": " << nodeIndex
+               << ", \"time\": " << Simulator::Now().GetSeconds()
+               << ", \"instanceId\": " << +instanceId << "}" << std::endl;
+}
+
 static void
 PrintDodag(NodeContainer nodes)
 {
@@ -213,7 +226,7 @@ static void
         return;
     }
 
-    origin->DiscoverRoute(target);
+    origin->DiscoverRoute(target, {{ 'true' if app.hop_by_hop else 'false' }});
 }
 
 {% endfor %}
@@ -235,7 +248,7 @@ static void
         return;
     }
 
-    origin->DiscoverP2pRoute(target);
+    origin->DiscoverP2pRoute(target, {{ 'true' if app.hop_by_hop else 'false' }});
 }
 
 {% endfor %}
@@ -330,6 +343,9 @@ main(int argc, char** argv)
 {% if rpl.enable_lql %}
     rplHelper.Set("EnableLql", BooleanValue(true));
 {% endif %}
+{% if rpl.storing %}
+    rplHelper.Set("Mop", UintegerValue(rpl::RPL_MOP_STORING_NO_MULTICAST));
+{% endif %}
 {# Compared against rpl::RplRoutingProtocol::GetTypeId()'s own defaults; only
    emitted when the scenario actually changed one, so an untouched RPL
    scenario's generated code stays as small as it was before these existed. #}
@@ -369,6 +385,9 @@ main(int argc, char** argv)
     rplHelper.Set("AodvRankLimit", UintegerValue({{ rpl.aodv_rank_limit }}));
     rplHelper.Set("AodvLifetime", UintegerValue({{ rpl.aodv_lifetime }}));
     rplHelper.Set("AodvRejoinReenable", TimeValue(Seconds({{ rpl.aodv_rejoin_reenable }})));
+{% if rpl.aodv_force_asymmetric %}
+    rplHelper.Set("AodvForceAsymmetric", BooleanValue(true));
+{% endif %}
 {% endif %}
 {% if has_p2p_discover %}
     // P2P-RPL (RFC 6997) route-discovery tuning; see RplConfig's p2p*
@@ -382,10 +401,24 @@ main(int argc, char** argv)
     rplHelper.Set("P2pDroAckRequested", BooleanValue({{ 'true' if rpl.p2p_dro_ack_requested else 'false' }}));
     rplHelper.Set("P2pDroAckWaitTime", TimeValue(Seconds({{ rpl.p2p_dro_ack_wait_time }})));
     rplHelper.Set("P2pDroMaxRetransmissions", UintegerValue({{ rpl.p2p_dro_max_retransmissions }}));
+    rplHelper.Set("P2pNumRoutes", UintegerValue({{ rpl.p2p_num_routes }}));
+{% if rpl.p2p_num_routes > 0 %}
+    rplHelper.Set("P2pDroCollectWindow", TimeValue(Seconds({{ rpl.p2p_dro_collect_window }})));
+{% endif %}
 {% endif %}
     InternetStackHelper internet;
     internet.SetRoutingHelper(rplHelper);
     internet.Install(nodes);
+
+    for (uint32_t i = 0; i < nodes.GetN(); i++)
+    {
+        Ptr<rpl::RplRoutingProtocol> nodeRpl = nodes.Get(i)->GetObject<rpl::RplRoutingProtocol>();
+        if (nodeRpl)
+        {
+            nodeRpl->TraceConnectWithoutContext("RankErrorConfirmed",
+                                                MakeBoundCallback(&OnRankErrorConfirmed, i));
+        }
+    }
 {% else %}
     InternetStackHelper internet;
     internet.Install(nodes);

@@ -25,6 +25,11 @@ from .models import Scenario
 # run log and delivered as structured messages instead: left in, they would
 # bury the readable output under one JSON object per node per sample.
 RPL_TABLE_MARKER = "##RPLTABLE## "
+# Prefix the generated scenario puts in front of each confirmed-routing-loop
+# event (RplRoutingProtocol's "RankErrorConfirmed" trace source; see
+# templates/scenario.cc.j2's OnRankErrorConfirmed()). Same reasoning as
+# RPL_TABLE_MARKER: lifted out of the log and delivered as its own message.
+LOOP_EVENT_MARKER = "##LOOPEVENT## "
 
 
 class RunManager:
@@ -37,6 +42,7 @@ class RunManager:
         self.exit_code: int | None = None
         self.lines: list[str] = []
         self.rpl_tables: list[dict] = []
+        self.loop_events: list[dict] = []
         self._process: asyncio.subprocess.Process | None = None
         self._listeners: set[asyncio.Queue] = set()
 
@@ -64,6 +70,7 @@ class RunManager:
         self.exit_code = None
         self.lines = []
         self.rpl_tables = []
+        self.loop_events = []
         self.state = "running"
         self._broadcast({"type": "status", **self.status()})
 
@@ -84,6 +91,8 @@ class RunManager:
         async for raw in self._process.stdout:
             line = raw.decode(errors="replace").rstrip("\n")
             if self._take_rpl_table(line):
+                continue
+            if self._take_loop_event(line):
                 continue
             self.lines.append(line)
             self._broadcast({"type": "line", "text": line})
@@ -110,6 +119,25 @@ class RunManager:
             return False
         self.rpl_tables.append(snapshot)
         self._broadcast({"type": "rplTable", "snapshot": snapshot})
+        return True
+
+    def _take_loop_event(self, line: str) -> bool:
+        """Record a marked loop event line; True if the line was one.
+
+        Same "pass unparseable lines back to the log" reasoning as
+        _take_rpl_table().
+        """
+        start = line.find(LOOP_EVENT_MARKER)
+        if start < 0:
+            return False
+        try:
+            event = json.loads(line[start + len(LOOP_EVENT_MARKER) :])
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(event, dict):
+            return False
+        self.loop_events.append(event)
+        self._broadcast({"type": "loopEvent", "event": event})
         return True
 
     async def stop(self) -> dict:
@@ -142,6 +170,7 @@ class RunManager:
         self._listeners.add(queue)
         backlog: list[dict] = [{"type": "line", "text": line} for line in self.lines]
         backlog += [{"type": "rplTable", "snapshot": s} for s in self.rpl_tables]
+        backlog += [{"type": "loopEvent", "event": e} for e in self.loop_events]
         backlog.append({"type": "status", **self.status()})
         return backlog, queue
 

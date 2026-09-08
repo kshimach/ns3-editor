@@ -2,7 +2,7 @@
 // Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
 // without written permission.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useEditor } from "../store";
 import { LoopEvent, RplSnapshot } from "../types";
@@ -18,7 +18,17 @@ function seconds(value: number | null): string {
   return value === null ? "無期限" : `${value.toFixed(1)}s`;
 }
 
-function LoopEvents({ events, nodeLabel }: { events: LoopEvent[]; nodeLabel: (i: number) => string }) {
+function LoopEvents({
+  events,
+  nodeLabel,
+  onHover,
+  onSelect,
+}: {
+  events: LoopEvent[];
+  nodeLabel: (i: number) => string;
+  onHover: (node: number | null) => void;
+  onSelect: (node: number) => void;
+}) {
   if (events.length === 0) {
     return null;
   }
@@ -29,7 +39,13 @@ function LoopEvents({ events, nodeLabel }: { events: LoopEvent[]; nodeLabel: (i:
       </summary>
       <ul>
         {events.map((e, i) => (
-          <li key={i} className="mono">
+          <li
+            key={i}
+            className="mono loop-event-row"
+            onMouseEnter={() => onHover(e.node)}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => onSelect(e.node)}
+          >
             {e.time.toFixed(1)}s -- {nodeLabel(e.node)} (instance {e.instanceId})
           </li>
         ))}
@@ -42,6 +58,9 @@ export function RplTables() {
   const snapshots = useEditor((s) => s.rplSnapshots);
   const loopEvents = useEditor((s) => s.loopEvents);
   const scenario = useEditor((s) => s.scenario);
+  const selection = useEditor((s) => s.selection);
+  const select = useEditor((s) => s.select);
+  const setPulsedNode = useEditor((s) => s.setPulsedNode);
   const [timeIndex, setTimeIndex] = useState<number | null>(null);
   const [nodeId, setNodeId] = useState<number | null>(null);
 
@@ -57,6 +76,21 @@ export function RplTables() {
     () => [...new Set(snapshots.map((s) => s.node))].sort((a, b) => a - b),
     [snapshots],
   );
+
+  // The canvas selecting a node (click, or a loop event jumping to one)
+  // steers which node this tab shows, so the two stay in lockstep instead of
+  // needing two separate "which node am I looking at" pickers.
+  useEffect(() => {
+    if (selection?.kind === "node") {
+      const idx = scenario.nodes.findIndex((n) => n.id === selection.id);
+      if (idx >= 0 && nodeIds.includes(idx)) {
+        setNodeId(idx);
+      }
+    }
+    // Only react to selection changes; re-running on every nodeIds update
+    // (e.g. a new snapshot arriving) would fight the user's own picks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection]);
 
   // Both selectors default to following the newest data rather than pinning
   // to whatever was first selected, so a running simulation updates in place.
@@ -75,6 +109,12 @@ export function RplTables() {
     return n ? `${index}: ${n.name || n.id}` : `node ${index}`;
   };
 
+  const selectNodeOnCanvas = (index: number) => {
+    setNodeId(index);
+    const n = scenario.nodes[index];
+    if (n) select({ kind: "node", id: n.id });
+  };
+
   if (snapshots.length === 0) {
     return (
       <div className="rpl-tables empty">
@@ -84,14 +124,24 @@ export function RplTables() {
             ? " 「実行」タブでシミュレーションを開始してください。"
             : " このシナリオは RPL でルーティングしていません。"}
         </p>
-        <LoopEvents events={loopEvents} nodeLabel={nodeLabel} />
+        <LoopEvents
+          events={loopEvents}
+          nodeLabel={nodeLabel}
+          onHover={setPulsedNode}
+          onSelect={selectNodeOnCanvas}
+        />
       </div>
     );
   }
 
   return (
     <div className="rpl-tables">
-      <LoopEvents events={loopEvents} nodeLabel={nodeLabel} />
+      <LoopEvents
+        events={loopEvents}
+        nodeLabel={nodeLabel}
+        onHover={setPulsedNode}
+        onSelect={selectNodeOnCanvas}
+      />
       <div className="rpl-controls">
         <label>
           時刻
@@ -108,7 +158,7 @@ export function RplTables() {
           ノード
           <select
             value={selectedNode ?? ""}
-            onChange={(e) => setNodeId(Number(e.target.value))}
+            onChange={(e) => selectNodeOnCanvas(Number(e.target.value))}
           >
             {nodeIds.map((id) => (
               <option key={id} value={id}>
@@ -194,6 +244,34 @@ function NodeTables({ snapshot }: { snapshot: RplSnapshot }) {
                 <td>{etx(p.linkEtx)}</td>
                 <td>{etx(p.pathEtx)}</td>
                 <td>{p.lql === null ? "-" : p.lql}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <h5>下り経路 (Storing, {snapshot.downwardRoutes.length})</h5>
+      {snapshot.downwardRoutes.length === 0 ? (
+        <p className="rpl-unjoined">
+          {snapshot.role === "root" ? "なし (Non-storing の場合はルートのトポロジ表を参照)" : "なし"}
+        </p>
+      ) : (
+        <table className="rpl-table">
+          <thead>
+            <tr>
+              <th>ターゲット</th>
+              <th>次ホップ</th>
+              <th>path seq</th>
+              <th>残り寿命</th>
+            </tr>
+          </thead>
+          <tbody>
+            {snapshot.downwardRoutes.map((r) => (
+              <tr key={r.target}>
+                <td className="mono">{r.target}</td>
+                <td className="mono">{r.nextHop}</td>
+                <td>{r.pathSequence}</td>
+                <td>{seconds(r.expiresIn)}</td>
               </tr>
             ))}
           </tbody>

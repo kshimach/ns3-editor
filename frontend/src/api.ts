@@ -12,6 +12,9 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  health: () =>
+    fetch("/api/health").then((r) => json<{ ok: boolean; ns3Dir: string; ns3DirExists: boolean }>(r)),
+
   listScenarios: () =>
     fetch("/api/scenarios").then((r) => json<{ file: string; name: string }[]>(r)),
 
@@ -24,6 +27,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(scenario),
     }).then((r) => json<{ saved: string }>(r)),
+
+  deleteScenario: (name: string) =>
+    fetch(`/api/scenarios/${encodeURIComponent(name)}`, { method: "DELETE" }).then((r) =>
+      json<{ deleted: string }>(r),
+    ),
 
   validate: (scenario: Scenario) =>
     fetch("/api/validate", {

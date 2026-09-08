@@ -30,6 +30,12 @@ RPL_TABLE_MARKER = "##RPLTABLE## "
 # templates/scenario.cc.j2's OnRankErrorConfirmed()). Same reasoning as
 # RPL_TABLE_MARKER: lifted out of the log and delivered as its own message.
 LOOP_EVENT_MARKER = "##LOOPEVENT## "
+# Prefix for a node's own global IPv6 address, emitted alongside each RPL
+# table snapshot (see templates/scenario.cc.j2's DumpRplTables()). Kept as
+# its own marker/message type rather than folded into the RPLTABLE snapshot
+# itself, since it comes from the generated code directly rather than from
+# contrib/rpl's PrintRoutingTableJson().
+RPL_ADDR_MARKER = "##RPLADDR## "
 
 
 class RunManager:
@@ -43,6 +49,7 @@ class RunManager:
         self.lines: list[str] = []
         self.rpl_tables: list[dict] = []
         self.loop_events: list[dict] = []
+        self.rpl_addrs: list[dict] = []
         self._process: asyncio.subprocess.Process | None = None
         self._listeners: set[asyncio.Queue] = set()
 
@@ -71,6 +78,7 @@ class RunManager:
         self.lines = []
         self.rpl_tables = []
         self.loop_events = []
+        self.rpl_addrs = []
         self.state = "running"
         self._broadcast({"type": "status", **self.status()})
 
@@ -93,6 +101,8 @@ class RunManager:
             if self._take_rpl_table(line):
                 continue
             if self._take_loop_event(line):
+                continue
+            if self._take_rpl_addr(line):
                 continue
             self.lines.append(line)
             self._broadcast({"type": "line", "text": line})
@@ -140,6 +150,25 @@ class RunManager:
         self._broadcast({"type": "loopEvent", "event": event})
         return True
 
+    def _take_rpl_addr(self, line: str) -> bool:
+        """Record a marked node-address line; True if the line was one.
+
+        Same "pass unparseable lines back to the log" reasoning as
+        _take_rpl_table().
+        """
+        start = line.find(RPL_ADDR_MARKER)
+        if start < 0:
+            return False
+        try:
+            addr = json.loads(line[start + len(RPL_ADDR_MARKER) :])
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(addr, dict):
+            return False
+        self.rpl_addrs.append(addr)
+        self._broadcast({"type": "rplAddr", "addr": addr})
+        return True
+
     async def stop(self) -> dict:
         if self._process is not None and self.state == "running":
             self.state = "stopped"
@@ -171,6 +200,7 @@ class RunManager:
         backlog: list[dict] = [{"type": "line", "text": line} for line in self.lines]
         backlog += [{"type": "rplTable", "snapshot": s} for s in self.rpl_tables]
         backlog += [{"type": "loopEvent", "event": e} for e in self.loop_events]
+        backlog += [{"type": "rplAddr", "addr": a} for a in self.rpl_addrs]
         backlog.append({"type": "status", **self.status()})
         return backlog, queue
 

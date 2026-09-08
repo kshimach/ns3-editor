@@ -231,6 +231,29 @@ export interface LoopEvent {
   instanceId: number;
 }
 
+/**
+ * A downward route this node holds towards a descendant (Storing mode /
+ * RFC 6550 MOP != 0 only -- empty in Non-storing, where only the root keeps
+ * downward state, as `topology` above).
+ */
+export interface RplDownwardRouteEntry {
+  target: string;
+  nextHop: string;
+  pathSequence: number;
+  expiresIn: number | null;
+}
+
+/**
+ * A node's own global IPv6 address, emitted by the generated code itself
+ * (see scenario.cc.j2's DumpRplTables) rather than by contrib/rpl -- used
+ * only to resolve `RplSnapshot.preferredParent` back to a node id for the
+ * canvas's parent-link overlay.
+ */
+export interface RplAddr {
+  node: number;
+  address: string;
+}
+
 export interface RplSnapshot {
   node: number;
   time: number;
@@ -255,6 +278,43 @@ export interface RplSnapshot {
   aodvRoutes: RplAodvRouteEntry[];
   /** P2P-RPL's own equivalent of aodvRoutes above, same H=0 caveat. */
   p2pRoutes: RplP2pRouteEntry[];
+  /** Storing mode only (see RplDownwardRouteEntry); empty under Non-storing. */
+  downwardRoutes: RplDownwardRouteEntry[];
+}
+
+export function defaultRplConfig(id: string): RplConfig {
+  return {
+    id,
+    root: "",
+    ocp: "of0",
+    enableLql: false,
+    mop: "non-storing",
+    disInterval: 30,
+    dioIntervalMin: 4.096,
+    dioIntervalDoublings: 8,
+    dioRedundancy: 0,
+    minHopRankIncrease: 128,
+    daoInterval: 60,
+    daoAckTimeout: 5,
+    daoRetries: 3,
+    pathLifetime: 30,
+    aodvDioIntervalMin: 0.128,
+    aodvDioIntervalDoublings: 4,
+    aodvRankLimit: 8,
+    aodvLifetime: 1,
+    aodvRejoinReenable: 900,
+    aodvForceAsymmetric: false,
+    p2pDioIntervalMin: 0.064,
+    p2pDioIntervalDoublings: 4,
+    p2pDioRedundancy: 1,
+    p2pMaxRank: 8,
+    p2pLifetime: 2,
+    p2pDroAckRequested: true,
+    p2pDroAckWaitTime: 1,
+    p2pDroMaxRetransmissions: 3,
+    p2pNumRoutes: 0,
+    p2pDroCollectWindow: 0.256,
+  };
 }
 
 export function defaultNetwork(id: string, type: NetworkType, x: number, y: number): Network {
@@ -288,44 +348,30 @@ export function defaultScenario(): Scenario {
     stack: {
       ip: "ipv4",
       routing: "global",
-      rpl: [
-        {
-          id: "rpl0",
-          root: "",
-          ocp: "of0",
-          enableLql: false,
-          mop: "non-storing",
-          disInterval: 30,
-          dioIntervalMin: 4.096,
-          dioIntervalDoublings: 8,
-          dioRedundancy: 0,
-          minHopRankIncrease: 128,
-          daoInterval: 60,
-          daoAckTimeout: 5,
-          daoRetries: 3,
-          pathLifetime: 30,
-          aodvDioIntervalMin: 0.128,
-          aodvDioIntervalDoublings: 4,
-          aodvRankLimit: 8,
-          aodvLifetime: 1,
-          aodvRejoinReenable: 900,
-          aodvForceAsymmetric: false,
-          p2pDioIntervalMin: 0.064,
-          p2pDioIntervalDoublings: 4,
-          p2pDioRedundancy: 1,
-          p2pMaxRank: 8,
-          p2pLifetime: 2,
-          p2pDroAckRequested: true,
-          p2pDroAckWaitTime: 1,
-          p2pDroMaxRetransmissions: 3,
-          p2pNumRoutes: 0,
-          p2pDroCollectWindow: 0.256,
-        },
-      ],
+      rpl: [defaultRplConfig("rpl0")],
     },
     apps: [],
   };
 }
+
+/** Japanese display name for each app kind, used wherever a type is shown to the user. */
+export const APP_LABELS: Record<App["type"], string> = {
+  ping: "Ping",
+  udpEcho: "UDP Echo",
+  onoff: "OnOff",
+  aodvDiscover: "AODV-RPL 探索",
+  p2pDiscover: "P2P-RPL 探索",
+};
+
+/** Friendly form of the raw 802.11 standard tokens used by WifiParams.standard. */
+export const WIFI_STANDARD_LABELS: Record<string, string> = {
+  "80211a": "802.11a",
+  "80211b": "802.11b",
+  "80211g": "802.11g",
+  "80211n": "802.11n",
+  "80211ac": "802.11ac",
+  "80211ax": "802.11ax",
+};
 
 export const NETWORK_LABELS: Record<NetworkType, string> = {
   p2p: "P2P リンク",

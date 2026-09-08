@@ -138,11 +138,24 @@ def _validate_stack(scenario: Scenario, node_ids: set[str], issues: list[Issue])
 
 def _validate_apps(scenario: Scenario, node_ids: set[str], issues: list[Issue]) -> None:
     duration = scenario.simulation.duration
+    connected = {m for net in scenario.networks for m in net.members}
     for app in scenario.apps:
         endpoints = _app_endpoints(app)
         for endpoint in endpoints:
             if endpoint not in node_ids:
                 _err(issues, app.id, f"存在しないノードを参照しています: {endpoint}")
+            elif endpoint not in connected:
+                # codegen's _target_address_expr() has no address to resolve
+                # for a node that never joined any network, and raises
+                # CodegenError -- surfacing that only at generate/run time
+                # would make a scenario look clean here and then fail with a
+                # 422 anyway, so it is promoted to an error up front.
+                name = next((n.name or n.id for n in scenario.nodes if n.id == endpoint), endpoint)
+                _err(
+                    issues,
+                    app.id,
+                    f"ノード '{name}' がどのネットワークにも属していないため、アドレスを解決できません",
+                )
         if len(endpoints) == 2 and endpoints[0] == endpoints[1] and endpoints[0] in node_ids:
             _warn(issues, app.id, "送信元と宛先が同じノードです")
         if app.start >= duration:

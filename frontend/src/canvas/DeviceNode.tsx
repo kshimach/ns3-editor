@@ -5,6 +5,7 @@
 import { Handle, Position } from "@xyflow/react";
 
 import { NetworkType } from "../types";
+import { CrownIcon, UnconnectedIcon, WiredIcon, WirelessIcon } from "./icons";
 
 /** One shared segment this node belongs to. */
 export interface DeviceBadge {
@@ -12,18 +13,39 @@ export interface DeviceBadge {
   type: NetworkType;
 }
 
+const WIRELESS_TYPES: NetworkType[] = ["lrwpan", "wifiAdhoc", "wifiInfra"];
+
+function iconFor(badges: DeviceBadge[]) {
+  if (badges.some((b) => WIRELESS_TYPES.includes(b.type))) return <WirelessIcon />;
+  if (badges.length > 0) return <WiredIcon />;
+  return <UnconnectedIcon />;
+}
+
 export function DeviceNode({
   data,
   selected,
 }: {
-  data: { label: string; badges?: DeviceBadge[]; rangePx?: number | null };
+  data: {
+    label: string;
+    badges?: DeviceBadge[];
+    rangePx?: number | null;
+    isRoot?: boolean;
+    issues?: string[];
+    hasWarning?: boolean;
+    hasError?: boolean;
+    pulsing?: boolean;
+  };
   selected?: boolean;
 }) {
   const badges = data.badges ?? [];
   const range = data.rangePx;
+  const title = data.issues && data.issues.length > 0 ? data.issues.join("\n") : undefined;
   return (
-    <div className={`device-node${selected ? " selected" : ""}`}>
-      <Handle type="target" position={Position.Top} />
+    <div
+      className={`device-node${selected ? " selected" : ""}${data.hasError ? " has-error" : ""}${data.hasWarning ? " has-warning" : ""}${data.pulsing ? " pulsing" : ""}`}
+      title={title}
+    >
+      <Handle type="target" position={Position.Top} title="ドラッグでセグメントに接続" />
       <div className="device-icon-wrap">
         {/*
           Anchored to the icon itself (44x44), not the wider label/badge
@@ -36,7 +58,12 @@ export function DeviceNode({
         {range !== null && range !== undefined && (
           <div className="radio-range" style={{ width: range * 2, height: range * 2 }} />
         )}
-        <div className="device-icon">PC</div>
+        {data.isRoot && (
+          <div className="root-badge" title="DODAG root">
+            <CrownIcon />
+          </div>
+        )}
+        <div className="device-icon">{iconFor(badges)}</div>
       </div>
       <div className="device-label">{data.label}</div>
       {/* Membership is shown here instead of as a spoke drawn to the hub. */}
@@ -49,7 +76,7 @@ export function DeviceNode({
           ))}
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} title="ドラッグで P2P リンク / セグメントに接続" />
     </div>
   );
 }

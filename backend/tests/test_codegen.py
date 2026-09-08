@@ -308,6 +308,16 @@ def test_rpl_table_snapshots_scheduled_by_default():
     assert "PrintDodag" in code
 
 
+def test_rpl_table_dump_also_emits_each_nodes_address():
+    # PrintRoutingTableJson() has no field for a node's own address (only its
+    # candidates' and its topology's), so the canvas's parent-link overlay
+    # has nothing to resolve preferredParent against without this: emitted
+    # by the generated code itself, not contrib/rpl.
+    code = generate(_load("rpl-line"))
+    assert "##RPLADDR## " in code
+    assert "GetObject<Ipv6>()" in code
+
+
 def test_rpl_table_snapshots_can_be_turned_off():
     scenario = _load("rpl-line")
     scenario.simulation.rplTableInterval = 0
@@ -415,6 +425,24 @@ def test_isolated_node_is_warning_not_error():
     issues = validate_scenario(scenario)
     assert any(i.level == "warning" and i.elementId == "n9" for i in issues)
     assert not has_errors(issues)
+
+
+def test_app_endpoint_on_unjoined_node_is_an_error_at_validate_time():
+    # Before this check existed, a scenario like this would validate clean
+    # and only fail with a 422 once /api/run actually tried to generate it
+    # (codegen._target_address_expr has no address to resolve). Promoting it
+    # to a validate-time error means the 問題 tab shows it before the user
+    # ever presses 実行.
+    scenario = _load("wifi-adhoc-ping")
+    scenario.nodes.append(type(scenario.nodes[0])(id="n9", name="lonely", x=0, y=0))
+    scenario.apps[0].to = "n9"
+    issues = validate_scenario(scenario)
+    assert any(
+        i.level == "error" and i.elementId == scenario.apps[0].id and "lonely" in i.message
+        for i in issues
+    ), [i.message for i in issues if i.elementId == scenario.apps[0].id]
+    with pytest.raises(CodegenError):
+        generate(scenario)
 
 
 def test_slug_is_filesystem_safe():

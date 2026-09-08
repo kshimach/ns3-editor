@@ -72,6 +72,14 @@ PrintDodag(NodeContainer nodes)
 // and re-emitted with the marker prepended, rather than written straight to
 // std::cout, so that the marker is guaranteed to sit on the same line as the
 // object it introduces.
+//
+// Alongside each node's table, its own global IPv6 address is emitted too
+// (behind a separate marker, ##RPLADDR##) purely so the editor's canvas can
+// draw the preferred-parent links: PrintRoutingTableJson() reports each
+// candidate parent's address, but has nothing to say about *this* node's
+// own address, and contrib/rpl is not the place to add that -- every piece
+// needed to resolve it (the node's own Ipv6 object) is already sitting right
+// here in the generated code.
 static void
 DumpRplTables(NodeContainer nodes, Time interval)
 {
@@ -91,6 +99,28 @@ DumpRplTables(NodeContainer nodes, Time interval)
             line.pop_back();
         }
         std::cout << "##RPLTABLE## " << line << std::endl;
+
+        Ptr<Ipv6> ipv6 = (*i)->GetObject<Ipv6>();
+        Ipv6Address global = Ipv6Address::GetAny();
+        for (uint32_t k = 0; ipv6 && global.IsAny() && k < ipv6->GetNInterfaces(); k++)
+        {
+            for (uint32_t j = 0; j < ipv6->GetNAddresses(k); j++)
+            {
+                Ipv6Address addr = ipv6->GetAddress(k, j).GetAddress();
+                if (!addr.IsLinkLocal() && !addr.IsLocalhost() && addr != Ipv6Address::GetAny())
+                {
+                    global = addr;
+                    break;
+                }
+            }
+        }
+        if (!global.IsAny())
+        {
+            std::ostringstream addrLine;
+            addrLine << "##RPLADDR## {\"node\": " << (*i)->GetId() << ", \"address\": \"" << global
+                     << "\"}";
+            std::cout << addrLine.str() << std::endl;
+        }
     }
     // Reschedules itself rather than being registered up front for every
     // sampling instant, so the number of pending events stays at one however

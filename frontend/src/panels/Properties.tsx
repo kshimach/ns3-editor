@@ -2,9 +2,10 @@
 // Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
 // without written permission.
 
+import { Field } from "../components/Field";
 import { NumberField } from "../components/NumberField";
 import { useEditor } from "../store";
-import { NETWORK_LABELS, Network } from "../types";
+import { NETWORK_LABELS, Network, WIFI_STANDARD_LABELS } from "../types";
 
 export function Properties() {
   const scenario = useEditor((s) => s.scenario);
@@ -32,31 +33,93 @@ function NodeProps({ id }: { id: string }) {
   const scenario = useEditor((s) => s.scenario);
   const updateNode = useEditor((s) => s.updateNode);
   const removeElement = useEditor((s) => s.removeElement);
+  const addMember = useEditor((s) => s.addMember);
+  const removeMember = useEditor((s) => s.removeMember);
+  const setDodagRoot = useEditor((s) => s.setDodagRoot);
+  const setRightTab = useEditor((s) => s.setRightTab);
+  const select = useEditor((s) => s.select);
   const node = scenario.nodes.find((n) => n.id === id);
   if (!node) return null;
 
-  const memberships = scenario.networks.filter((n) => n.members.includes(id));
-  const scale = scenario.simulation.scale;
+  const shared = scenario.networks.filter((n) => n.type !== "p2p");
+  const scale = scenario.simulation.scale || 1;
+  const isRpl = scenario.stack.routing === "rpl";
+  const isRoot = isRpl && scenario.stack.rpl[0]?.root === id;
+
+  const relatedApps = scenario.apps.filter((a) =>
+    Object.values(a)
+      .filter((v): v is string => typeof v === "string")
+      .includes(id),
+  );
 
   return (
     <div className="properties">
       <h3>ノード {node.id}</h3>
-      <label>
-        名前
+      <Field label="名前">
         <input value={node.name} onChange={(e) => updateNode(id, { name: e.target.value })} />
-      </label>
-      <div className="hint">
-        位置: ({Math.round(node.x * scale)}m, {Math.round(node.y * scale)}m)
-      </div>
+      </Field>
+      <Field label="座標" unit="m">
+        <div className="coord-row">
+          <NumberField
+            value={Math.round(node.x * scale)}
+            fallback={0}
+            onCommit={(m) => updateNode(id, { x: m / scale })}
+          />
+          <NumberField
+            value={Math.round(node.y * scale)}
+            fallback={0}
+            onCommit={(m) => updateNode(id, { y: m / scale })}
+          />
+        </div>
+      </Field>
+
+      {isRpl && (
+        <Field label="DODAG root" help="この RPL インスタンスの起点にする">
+          <label className="inline-checkbox">
+            <input type="checkbox" checked={isRoot} onChange={() => setDodagRoot(id)} />
+            root にする
+          </label>
+        </Field>
+      )}
+
       <h4>所属ネットワーク</h4>
-      {memberships.length === 0 && <div className="hint">なし (未接続)</div>}
+      {shared.length === 0 && <div className="hint">セグメントがありません</div>}
+      <ul className="membership-list">
+        {shared.map((net) => {
+          const joined = net.members.includes(id);
+          return (
+            <li key={net.id}>
+              <label className="inline-checkbox">
+                <input
+                  type="checkbox"
+                  checked={joined}
+                  onChange={() => (joined ? removeMember(net.id, id) : addMember(net.id, id))}
+                />
+                {NETWORK_LABELS[net.type]} ({net.id})
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+
+      <h4>関連アプリ ({relatedApps.length})</h4>
+      {relatedApps.length === 0 && <div className="hint">なし</div>}
       <ul>
-        {memberships.map((n) => (
-          <li key={n.id}>
-            {n.id} ({NETWORK_LABELS[n.type]})
+        {relatedApps.map((a) => (
+          <li key={a.id}>
+            <button
+              className="link-btn"
+              onClick={() => {
+                select({ kind: "app", id: a.id });
+                setRightTab("settings");
+              }}
+            >
+              {a.type}
+            </button>
           </li>
         ))}
       </ul>
+
       <button className="danger" onClick={() => removeElement(id)}>
         ノードを削除
       </button>
@@ -67,6 +130,7 @@ function NodeProps({ id }: { id: string }) {
 function NetworkProps({ net }: { net: Network }) {
   const scenario = useEditor((s) => s.scenario);
   const updateNetwork = useEditor((s) => s.updateNetwork);
+  const addMember = useEditor((s) => s.addMember);
   const removeMember = useEditor((s) => s.removeMember);
   const removeElement = useEditor((s) => s.removeElement);
   const nodeName = (id: string) => scenario.nodes.find((n) => n.id === id)?.name || id;
@@ -79,48 +143,47 @@ function NetworkProps({ net }: { net: Network }) {
 
       {net.type === "p2p" && (
         <>
-          <label>
-            DataRate
+          <Field label="データレート (DataRate)">
             <input
+              placeholder="例: 5Mbps"
               value={net.p2p.dataRate}
               onChange={(e) => updateNetwork(net.id, { p2p: { ...net.p2p, dataRate: e.target.value } })}
             />
-          </label>
-          <label>
-            Delay
+          </Field>
+          <Field label="遅延 (Delay)">
             <input
+              placeholder="例: 2ms"
               value={net.p2p.delay}
               onChange={(e) => updateNetwork(net.id, { p2p: { ...net.p2p, delay: e.target.value } })}
             />
-          </label>
+          </Field>
         </>
       )}
 
       {net.type === "csma" && (
         <>
-          <label>
-            DataRate
+          <Field label="データレート (DataRate)">
             <input
+              placeholder="例: 100Mbps"
               value={net.csma.dataRate}
               onChange={(e) =>
                 updateNetwork(net.id, { csma: { ...net.csma, dataRate: e.target.value } })
               }
             />
-          </label>
-          <label>
-            Delay
+          </Field>
+          <Field label="遅延 (Delay)">
             <input
+              placeholder="例: 6560ns"
               value={net.csma.delay}
               onChange={(e) => updateNetwork(net.id, { csma: { ...net.csma, delay: e.target.value } })}
             />
-          </label>
+          </Field>
         </>
       )}
 
       {(net.type === "wifiAdhoc" || net.type === "wifiInfra") && (
         <>
-          <label>
-            規格
+          <Field label="規格">
             <select
               value={net.wifi.standard}
               onChange={(e) =>
@@ -129,21 +192,19 @@ function NetworkProps({ net }: { net: Network }) {
             >
               {["80211a", "80211b", "80211g", "80211n", "80211ac", "80211ax"].map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {WIFI_STANDARD_LABELS[s]}
                 </option>
               ))}
             </select>
-          </label>
-          <label>
-            SSID
+          </Field>
+          <Field label="SSID">
             <input
               value={net.wifi.ssid}
               onChange={(e) => updateNetwork(net.id, { wifi: { ...net.wifi, ssid: e.target.value } })}
             />
-          </label>
+          </Field>
           {net.type === "wifiInfra" && (
-            <label>
-              AP ノード
+            <Field label="AP ノード">
               <select
                 value={net.wifi.apNode ?? ""}
                 onChange={(e) =>
@@ -157,7 +218,7 @@ function NetworkProps({ net }: { net: Network }) {
                   </option>
                 ))}
               </select>
-            </label>
+            </Field>
           )}
           <div className="hint">
             注意: デフォルト設定の WiFi は約 50m を超えると受信できません
@@ -168,8 +229,7 @@ function NetworkProps({ net }: { net: Network }) {
 
       {net.type === "lrwpan" && (
         <>
-          <label>
-            PAN ID
+          <Field label="PAN ID">
             <NumberField
               value={net.lrwpan.panId}
               fallback={1}
@@ -177,9 +237,8 @@ function NetworkProps({ net }: { net: Network }) {
               step="1"
               onCommit={(panId) => updateNetwork(net.id, { lrwpan: { ...net.lrwpan, panId } })}
             />
-          </label>
-          <label>
-            伝搬損失モデル
+          </Field>
+          <Field label="伝搬損失モデル">
             <select
               value={net.lrwpan.lossModel}
               onChange={(e) =>
@@ -189,9 +248,11 @@ function NetworkProps({ net }: { net: Network }) {
               <option value="logDistance">LogDistance</option>
               <option value="friis">Friis</option>
             </select>
-          </label>
-          <label>
-            エラーモデル
+          </Field>
+          <Field
+            label="エラーモデル"
+            help="「自動」は RPL が MRHOF (ETX ベース) を使うときだけ有効になる。LQI が変動しないと ETX がホップ数と区別つかなくなるための措置"
+          >
             <select
               value={net.lrwpan.errorModel === null ? "auto" : String(net.lrwpan.errorModel)}
               onChange={(e) => {
@@ -205,21 +266,42 @@ function NetworkProps({ net }: { net: Network }) {
               <option value="true">常に有効</option>
               <option value="false">無効</option>
             </select>
-          </label>
+          </Field>
         </>
       )}
 
       <h4>メンバー ({net.members.length})</h4>
-      <ul>
-        {net.members.map((m) => (
-          <li key={m}>
-            {nodeName(m)}
-            <button className="tiny" onClick={() => removeMember(net.id, m)}>
-              外す
-            </button>
-          </li>
-        ))}
-      </ul>
+      {net.type === "p2p" ? (
+        <>
+          <ul>
+            {net.members.map((m) => (
+              <li key={m}>{nodeName(m)}</li>
+            ))}
+          </ul>
+          <p className="hint">
+            P2P リンクの両端はちょうど 2 ノード。変更するにはキャンバスでこのリンクを削除し、
+            別のノード間へあらためてドラッグしてください。
+          </p>
+        </>
+      ) : (
+        <ul className="membership-list">
+          {scenario.nodes.map((n) => {
+            const joined = net.members.includes(n.id);
+            return (
+              <li key={n.id}>
+                <label className="inline-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={joined}
+                    onChange={() => (joined ? removeMember(net.id, n.id) : addMember(net.id, n.id))}
+                  />
+                  {n.name || n.id}
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <button className="danger" onClick={() => removeElement(net.id)}>
         ネットワークを削除
       </button>

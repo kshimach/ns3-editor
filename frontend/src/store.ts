@@ -10,6 +10,7 @@ import {
   LoopEvent,
   Network,
   NetworkType,
+  RplAddr,
   RplConfig,
   RplSnapshot,
   Scenario,
@@ -24,11 +25,29 @@ export type Selection =
   | { kind: "app"; id: string }
   | null;
 
+/** A short-lived notice about a side effect the user didn't directly ask for. */
+export interface Toast {
+  id: number;
+  message: string;
+}
+
+/** Which tab the right-hand inspector panel shows. */
+export type RightTab = "element" | "settings" | "rpl";
+
+/** Which tab the bottom drawer shows. */
+export type BottomTab = "issues" | "code" | "log" | "rpl";
+
 interface EditorState {
   scenario: Scenario;
   selection: Selection;
   issues: Issue[];
   counter: number;
+  /** Right-panel tab. Switches automatically when the canvas selection changes. */
+  rightTab: RightTab;
+  /** Bottom-drawer tab. Switches automatically on run/validation events. */
+  bottomTab: BottomTab;
+  /** Whether the bottom drawer is collapsed to its tab strip. */
+  bottomCollapsed: boolean;
   /**
    * RPL table snapshots from the current run, in arrival order. Kept here
    * rather than inside RunView because the run's WebSocket lives there while
@@ -38,14 +57,42 @@ interface EditorState {
   /** Confirmed routing-loop events from the current run, in arrival order. */
   loopEvents: LoopEvent[];
   /**
+   * Each node's own global IPv6 address, as reported by the run (see
+   * scenario.cc.j2's DumpRplTables). Used only to resolve a snapshot's
+   * preferredParent (an address) back to a node id, for the canvas's
+   * parent-link overlay -- keyed by node index, last report wins.
+   */
+  rplAddrs: Record<number, string>;
+  /**
    * Whether the canvas draws the approximate radio range ring around each
    * LR-WPAN/WiFi member node. Purely a view preference -- it affects nothing
    * the simulation does, so it lives here rather than on the scenario and is
    * not saved with it.
    */
   showRadioRange: boolean;
+  /** Whether the canvas shows each node's raw id next to its name. View-only, not saved. */
+  showNodeIds: boolean;
+  /** Whether the canvas overlays each joined node's link to its preferred parent. */
+  showParentLinks: boolean;
+  /** Node index to visually pulse on the canvas (hovering a loop event row), or null. */
+  pulsedNode: number | null;
+  /** Notices about side effects the user didn't directly trigger (auto-join, IPv6 switch). */
+  toasts: Toast[];
+  /**
+   * JSON of the scenario as of the last save/load, or null before the first
+   * one. Compared against the live scenario to show the unsaved-changes dot;
+   * kept as a plain string rather than a boolean so it survives being
+   * derived at render time without an extra piece of state to keep in sync.
+   */
+  savedSnapshot: string | null;
+  /** How many scenario edits can currently be undone / redone (for the toolbar buttons). */
+  undoCount: number;
+  redoCount: number;
 
   select: (sel: Selection) => void;
+  setRightTab: (tab: RightTab) => void;
+  setBottomTab: (tab: BottomTab) => void;
+  toggleBottomCollapsed: () => void;
   setScenario: (s: Scenario) => void;
   setIssues: (issues: Issue[]) => void;
   updateScenario: (patch: Partial<Scenario>) => void;
@@ -53,7 +100,12 @@ interface EditorState {
   clearRplSnapshots: () => void;
   addLoopEvent: (event: LoopEvent) => void;
   clearLoopEvents: () => void;
+  addRplAddr: (addr: RplAddr) => void;
+  clearRplAddrs: () => void;
   toggleRadioRange: () => void;
+  toggleNodeIds: () => void;
+  toggleParentLinks: () => void;
+  setPulsedNode: (node: number | null) => void;
 
   addNode: (x: number, y: number) => void;
   addSegment: (type: Exclude<NetworkType, "p2p">, x: number, y: number) => void;
@@ -70,6 +122,14 @@ interface EditorState {
   addRplInstance: (instance: RplConfig) => void;
   updateRplInstance: (id: string, patch: Partial<RplConfig>) => void;
   removeRplInstance: (id: string) => void;
+  setDodagRoot: (nodeId: string) => void;
+
+  pushToast: (message: string) => void;
+  dismissToast: (id: number) => void;
+
+  markSaved: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 let nextId = 0;
@@ -77,16 +137,77 @@ let nextId = 0;
 /** Shared segments (everything but p2p) are the ones a node "joins". */
 const sharedSegments = (scenario: Scenario) => scenario.networks.filter((n) => n.type !== "p2p");
 
+// --- undo/redo history ---
+//
+// Kept as plain module-level arrays rather than in the zustand state itself:
+// every entry is a whole past Scenario, and pushing one on every edit would
+// mean every edit re-renders every undoCount/redoCount consumer twice (once
+// for the edit, once for the history bookkeeping) for a number nothing
+// outside the toolbar's two buttons needs at fine granularity. The reactive
+// undoCount/redoCount fields below are only updated (via a normal `set`)
+// when the *count* actually changes, which is what the toolbar renders from.
+//
+// A history entry is *not* pushed on every scenario change immediately --
+// changes within HISTORY_DEBOUNCE_MS of each other are coalesced into one
+// entry (dated from the start of the burst). This is what turns a node drag
+// (dozens of moveElement calls while the mouse moves) or a burst of
+// keystrokes in a text field into a single undo step, without Canvas or any
+// input needing to know about history at all.
+const HISTORY_DEBOUNCE_MS = 500;
+const HISTORY_LIMIT = 50;
+let historyPast: Scenario[] = [];
+let historyFuture: Scenario[] = [];
+let pendingBaseline: Scenario | null = null;
+let pendingTimer: ReturnType<typeof setTimeout> | undefined;
+let suppressHistory = false;
+
+function syncHistoryCounts(set: (patch: Partial<EditorState>) => void) {
+  set({ undoCount: historyPast.length, redoCount: historyFuture.length });
+}
+
+function resetHistory(set: (patch: Partial<EditorState>) => void) {
+  window.clearTimeout(pendingTimer);
+  historyPast = [];
+  historyFuture = [];
+  pendingBaseline = null;
+  syncHistoryCounts(set);
+}
+
+const initialScenario = defaultScenario();
+
 export const useEditor = create<EditorState>((set, get) => ({
-  scenario: defaultScenario(),
+  scenario: initialScenario,
   selection: null,
   issues: [],
   counter: 0,
+  rightTab: "settings",
+  bottomTab: "issues",
+  bottomCollapsed: false,
   rplSnapshots: [],
   loopEvents: [],
+  rplAddrs: {},
   showRadioRange: true,
+  showNodeIds: false,
+  showParentLinks: false,
+  pulsedNode: null,
+  toasts: [],
+  // A never-edited, never-saved blank scenario is not "unsaved changes" --
+  // only a real edit away from this exact snapshot should show the dot.
+  savedSnapshot: JSON.stringify(initialScenario),
+  undoCount: 0,
+  redoCount: 0,
 
-  select: (selection) => set({ selection }),
+  select: (selection) =>
+    set({
+      selection,
+      // A node/network selection is what the "要素" tab is for; selecting an
+      // app is really a shortcut into its card on the "設定" tab, since apps
+      // have no properties-panel view of their own.
+      rightTab: selection === null ? get().rightTab : selection.kind === "app" ? "settings" : "element",
+    }),
+  setRightTab: (rightTab) => set({ rightTab }),
+  setBottomTab: (bottomTab) => set({ bottomTab, bottomCollapsed: false }),
+  toggleBottomCollapsed: () => set({ bottomCollapsed: !get().bottomCollapsed }),
   setScenario: (scenario) => {
     // Keep generated ids ahead of whatever the loaded scenario already uses.
     const used = [
@@ -102,7 +223,16 @@ export const useEditor = create<EditorState>((set, get) => ({
     // The snapshots are indexed by node number, which now means a different
     // node than it did: keeping them would label the old run's tables with
     // the new scenario's names. Same reasoning for loopEvents.
-    set({ scenario, selection: null, issues: [], rplSnapshots: [], loopEvents: [] });
+    set({
+      scenario,
+      selection: null,
+      issues: [],
+      rplSnapshots: [],
+      loopEvents: [],
+      rplAddrs: {},
+      savedSnapshot: JSON.stringify(scenario),
+    });
+    resetHistory(set);
   },
   setIssues: (issues) => set({ issues }),
   updateScenario: (patch) => set({ scenario: { ...get().scenario, ...patch } }),
@@ -110,7 +240,19 @@ export const useEditor = create<EditorState>((set, get) => ({
   clearRplSnapshots: () => set({ rplSnapshots: [] }),
   addLoopEvent: (event) => set({ loopEvents: [...get().loopEvents, event] }),
   clearLoopEvents: () => set({ loopEvents: [] }),
+  addRplAddr: (addr) => set({ rplAddrs: { ...get().rplAddrs, [addr.node]: addr.address } }),
+  clearRplAddrs: () => set({ rplAddrs: {} }),
   toggleRadioRange: () => set({ showRadioRange: !get().showRadioRange }),
+  toggleNodeIds: () => set({ showNodeIds: !get().showNodeIds }),
+  toggleParentLinks: () => set({ showParentLinks: !get().showParentLinks }),
+  setPulsedNode: (pulsedNode) => set({ pulsedNode }),
+
+  pushToast: (message) => {
+    const id = nextId++;
+    set({ toasts: [...get().toasts, { id, message }] });
+    setTimeout(() => get().dismissToast(id), 4000);
+  },
+  dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 
   addNode: (x, y) => {
     const id = `n${nextId++}`;
@@ -132,6 +274,9 @@ export const useEditor = create<EditorState>((set, get) => ({
       },
       selection: { kind: "node", id },
     });
+    if (joinId) {
+      get().pushToast(`${id} を ${joinId} に参加させました`);
+    }
   },
 
   addSegment: (type, x, y) => {
@@ -164,6 +309,12 @@ export const useEditor = create<EditorState>((set, get) => ({
       scenario: { ...scenario, networks: [...scenario.networks, net], stack },
       selection: { kind: "network", id },
     });
+    if (net.members.length > 0) {
+      get().pushToast(`${net.members.length} 個の未所属ノードを ${id} に参加させました`);
+    }
+    if (type === "lrwpan" && scenario.stack.ip !== "ipv6") {
+      get().pushToast("LR-WPAN 追加のため IP スタックを IPv6 に切り替えました");
+    }
   },
 
   addP2p: (a, b) => {
@@ -328,7 +479,69 @@ export const useEditor = create<EditorState>((set, get) => ({
       },
     });
   },
+
+  setDodagRoot: (nodeId) => {
+    const { scenario } = get();
+    if (scenario.stack.rpl.length === 0) return;
+    set({
+      scenario: {
+        ...scenario,
+        stack: {
+          ...scenario.stack,
+          rpl: scenario.stack.rpl.map((r, i) => (i === 0 ? { ...r, root: nodeId } : r)),
+        },
+      },
+    });
+  },
+
+  markSaved: () => set({ savedSnapshot: JSON.stringify(get().scenario) }),
+
+  undo: () => {
+    // A burst still mid-debounce counts as one more step to go back to: flush
+    // it into history immediately rather than letting undo silently miss it.
+    if (pendingBaseline !== null) {
+      window.clearTimeout(pendingTimer);
+      historyPast.push(pendingBaseline);
+      pendingBaseline = null;
+    }
+    const prev = historyPast.pop();
+    if (!prev) return;
+    historyFuture.push(get().scenario);
+    suppressHistory = true;
+    set({ scenario: prev, selection: null });
+    suppressHistory = false;
+    syncHistoryCounts(set);
+  },
+
+  redo: () => {
+    const next = historyFuture.pop();
+    if (!next) return;
+    historyPast.push(get().scenario);
+    suppressHistory = true;
+    set({ scenario: next, selection: null });
+    suppressHistory = false;
+    syncHistoryCounts(set);
+  },
 }));
+
+// Coalesces scenario edits that land within HISTORY_DEBOUNCE_MS of each
+// other into a single undo step -- see the comment above historyPast.
+useEditor.subscribe((state, prevState) => {
+  if (state.scenario === prevState.scenario || suppressHistory) return;
+  if (pendingBaseline === null) {
+    pendingBaseline = prevState.scenario;
+  }
+  window.clearTimeout(pendingTimer);
+  pendingTimer = setTimeout(() => {
+    if (pendingBaseline !== null) {
+      historyPast.push(pendingBaseline);
+      if (historyPast.length > HISTORY_LIMIT) historyPast.shift();
+      historyFuture = [];
+      pendingBaseline = null;
+      syncHistoryCounts(useEditor.setState);
+    }
+  }, HISTORY_DEBOUNCE_MS);
+});
 
 export function freshAppId(): string {
   return `app${nextId++}`;

@@ -4,26 +4,39 @@
 
 import { useEffect } from "react";
 
-import { useEditor } from "../store";
-import { NETWORK_LABELS } from "../types";
+import { freshAppId, useEditor } from "../store";
+import { NETWORK_LABELS, NetworkType } from "../types";
 
-/** The canvas element the menu was opened on, and where to draw the menu. */
-export interface MenuTarget {
-  id: string;
-  x: number;
-  y: number;
-}
+/** Either a right-click on an existing node/segment, or on empty canvas. */
+export type MenuTarget =
+  | { kind: "element"; id: string; x: number; y: number }
+  | { kind: "pane"; x: number; y: number; flowX: number; flowY: number };
+
+const SEGMENT_TYPES: Exclude<NetworkType, "p2p">[] = ["csma", "wifiAdhoc", "wifiInfra", "lrwpan"];
 
 /**
  * Right-click menu for a canvas element: join/leave a shared segment and jump
- * to its PHY/MAC settings without dragging a spoke from every node.
+ * to its PHY/MAC settings without dragging a spoke from every node. Also
+ * doubles as the "add here" menu when opened on empty canvas.
  */
-export function ContextMenu({ target, onClose }: { target: MenuTarget; onClose: () => void }) {
+export function ContextMenu({
+  target,
+  onClose,
+  onAddNode,
+  onAddSegment,
+}: {
+  target: MenuTarget;
+  onClose: () => void;
+  onAddNode: (x: number, y: number) => void;
+  onAddSegment: (type: Exclude<NetworkType, "p2p">, x: number, y: number) => void;
+}) {
   const scenario = useEditor((s) => s.scenario);
   const select = useEditor((s) => s.select);
   const addMember = useEditor((s) => s.addMember);
   const removeMember = useEditor((s) => s.removeMember);
   const removeElement = useEditor((s) => s.removeElement);
+  const addApp = useEditor((s) => s.addApp);
+  const setDodagRoot = useEditor((s) => s.setDodagRoot);
 
   useEffect(() => {
     const close = () => onClose();
@@ -40,15 +53,48 @@ export function ContextMenu({ target, onClose }: { target: MenuTarget; onClose: 
     };
   }, [onClose]);
 
-  const node = scenario.nodes.find((n) => n.id === target.id);
-  const segment = scenario.networks.find((n) => n.id === target.id);
-  const shared = scenario.networks.filter((n) => n.type !== "p2p");
-
   // Every entry acts and then dismisses.
   const run = (fn: () => void) => () => {
     fn();
     onClose();
   };
+
+  if (target.kind === "pane") {
+    return (
+      <div
+        className="context-menu"
+        style={{ left: target.x, top: target.y }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="context-section">ここに追加</div>
+        <button onClick={run(() => onAddNode(target.flowX, target.flowY))}>ノード</button>
+        {SEGMENT_TYPES.map((t) => (
+          <button key={t} onClick={run(() => onAddSegment(t, target.flowX, target.flowY))}>
+            {NETWORK_LABELS[t]}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  const node = scenario.nodes.find((n) => n.id === target.id);
+  const segment = scenario.networks.find((n) => n.id === target.id);
+  const shared = scenario.networks.filter((n) => n.type !== "p2p");
+  const isRpl = scenario.stack.routing === "rpl";
+  const otherNode = scenario.nodes.find((n) => n.id !== target.id)?.id ?? target.id;
+
+  const quickAdd = (type: "ping" | "onoff" | "aodvDiscover" | "p2pDiscover") =>
+    run(() => {
+      const base = { id: freshAppId(), from: target.id, to: otherNode, start: 1 };
+      if (type === "ping") {
+        addApp({ ...base, type, stop: null, count: 5, interval: 1 });
+      } else if (type === "onoff") {
+        addApp({ ...base, type, port: 9000, stop: null, dataRate: "500kbps", packetSize: 512 });
+      } else {
+        addApp({ ...base, type, hopByHop: false });
+      }
+      select({ kind: "app", id: base.id });
+    });
 
   return (
     <div
@@ -87,6 +133,23 @@ export function ContextMenu({ target, onClose }: { target: MenuTarget; onClose: 
                     {net.id} の設定...
                   </button>
                 ))}
+            </>
+          )}
+          {isRpl && (
+            <>
+              <div className="context-section">RPL</div>
+              <button onClick={run(() => setDodagRoot(node.id))}>
+                {scenario.stack.rpl[0]?.root === node.id ? "☑" : "☐"} DODAG root にする
+              </button>
+            </>
+          )}
+          {scenario.nodes.length > 1 && (
+            <>
+              <div className="context-section">このノードからアプリを追加</div>
+              <button onClick={quickAdd("ping")}>Ping</button>
+              <button onClick={quickAdd("onoff")}>OnOff</button>
+              {isRpl && <button onClick={quickAdd("aodvDiscover")}>AODV-RPL 探索</button>}
+              {isRpl && <button onClick={quickAdd("p2pDiscover")}>P2P-RPL 探索</button>}
             </>
           )}
           <hr />

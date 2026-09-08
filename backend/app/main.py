@@ -1,3 +1,7 @@
+# Copyright (c) 2026 kawashy. All rights reserved.
+# Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+# without written permission.
+
 """FastAPI entry point for the ns-3 scenario editor.
 
 Dev mode: run `uvicorn app.main:app --reload` and the Vite dev server with

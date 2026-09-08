@@ -1,3 +1,7 @@
+// Copyright (c) 2026 kawashy. All rights reserved.
+// Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+// without written permission.
+
 import { NumberField } from "../components/NumberField";
 import { useEditor } from "../store";
 import { NETWORK_LABELS, Network } from "../types";

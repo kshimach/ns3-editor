@@ -1,3 +1,7 @@
+# Copyright (c) 2026 kawashy. All rights reserved.
+# Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+# without written permission.
+
 """Pydantic schema for the scenario JSON the frontend edits.
 
 The schema is the single source of truth shared by validation, code

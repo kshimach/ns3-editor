@@ -1,3 +1,7 @@
+// Copyright (c) 2026 kawashy. All rights reserved.
+// Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+// without written permission.
+
 import { NumberField } from "../components/NumberField";
 import { freshAppId, freshRplId, useEditor } from "../store";
 import { App, RplConfig } from "../types";

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 kawashy. All rights reserved.
+// Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+// without written permission.
+
 // Mirror of backend/app/models.py. Keep the two in sync by hand for now.
 
 export type NetworkType = "p2p" | "csma" | "wifiAdhoc" | "wifiInfra" | "lrwpan";

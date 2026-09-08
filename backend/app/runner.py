@@ -1,3 +1,7 @@
+# Copyright (c) 2026 kawashy. All rights reserved.
+# Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+# without written permission.
+
 """Runs generated scenarios through ./ns3 and streams the output.
 
 One run at a time: ns-3 builds share a lock and concurrent scratch builds

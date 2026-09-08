@@ -1,3 +1,7 @@
+# Copyright (c) 2026 kawashy. All rights reserved.
+# Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+# without written permission.
+
 """Scenario consistency checks run before code generation.
 
 Every problem is reported as an Issue bound to the offending element id so

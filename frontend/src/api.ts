@@ -1,3 +1,7 @@
+// Copyright (c) 2026 kawashy. All rights reserved.
+// Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+// without written permission.
+
 import { Issue, RunStatus, Scenario } from "./types";
 
 async function json<T>(res: Response): Promise<T> {

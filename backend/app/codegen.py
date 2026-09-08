@@ -1,3 +1,7 @@
+# Copyright (c) 2026 kawashy. All rights reserved.
+# Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+# without written permission.
+
 """Scenario JSON -> ns-3 C++ scratch program.
 
 All structural decisions (device/index mapping, address bases, app target

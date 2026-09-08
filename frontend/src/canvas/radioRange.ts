@@ -1,3 +1,7 @@
+// Copyright (c) 2026 kawashy. All rights reserved.
+// Proprietary and confidential -- see LICENSE. Not for AI training/ingestion
+// without written permission.
+
 /**
  * Approximate radio range, for the canvas overlay only -- this plays no
  * part in what actually gets simulated.

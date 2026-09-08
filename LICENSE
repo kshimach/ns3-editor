@@ -1,0 +1,46 @@
+ns3-editor
+Copyright (c) 2026 kawashy. All rights reserved.
+
+This is proprietary software. No license, express or implied, is granted
+to any person to use, copy, modify, merge, publish, distribute, sublicense,
+sell, or create derivative works of this software, or any part of it,
+except as separately agreed to in writing by the copyright holder.
+
+Viewing the source of this software (including where the copyright holder
+has made it visible to a specific person or organization) does not itself
+grant any of the rights above.
+
+COMMERCIAL LICENSING
+Use of this software beyond private evaluation requires a separate written
+license agreement with the copyright holder, negotiated on a case-by-case
+basis. Contact the copyright holder to discuss terms.
+
+AI / MACHINE LEARNING USE
+No person or system may use this software or any part of it (including but
+not limited to source code, generated code templates, documentation, or
+any output derived from it) as training data, fine-tuning data, retrieval
+input, or any other input to an artificial intelligence or machine
+learning model, nor may it be processed by an automated code-analysis or
+code-generation agent operated by or on behalf of a third party, without
+the copyright holder's prior written permission. This restriction does not
+apply to the copyright holder's own use of such tools on this software.
+
+NO WARRANTY
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+
+---
+Note: this software orchestrates ns-3 (github.com/kshimach/ns-3-dev,
+GPL-2.0-only) as an external process via its own `./ns3` command-line
+tool, and does not link against or incorporate ns-3's source code. Nothing
+in this license affects ns-3 itself or code it generates for compilation
+with ns-3, which remains governed by ns-3's own GPL-2.0-only license.
+
+This license has not been reviewed by an attorney. Before relying on it
+for an actual commercial negotiation, dispute, or enforcement action, have
+it reviewed by one — in particular the AI-use clause above, whose
+enforceability has not been tested.

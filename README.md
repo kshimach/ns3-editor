@@ -72,3 +72,9 @@ cd backend && .venv/bin/python -m pytest
 ```
 
 生成コードのコンパイル確認は ns-3 側で: `./ns3 build ns3edit-<name>`
+
+## ライセンス
+
+Copyright (c) 2026 kawashy. All rights reserved. 独占的所有物 — [LICENSE](LICENSE) 参照。
+AI学習・読み込みへの利用は書面での許諾なく禁止。ns-3自体(GPL-2.0-only)とは別個の著作物であり、
+サブプロセス経由で呼び出すのみでリンク・組み込みはしていない。
